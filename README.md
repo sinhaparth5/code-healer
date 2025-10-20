@@ -77,7 +77,7 @@ graph TD
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/your-org/autofix.git
+git clone https://github.com/sinhaparth5/code-healer.git
 cd autofix
 pip install -r requirements.txt
 
