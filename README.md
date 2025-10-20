@@ -1,4 +1,4 @@
-# AutoFix - Self-Healing DevSecOps Agent 🤖
+# CodeHealer - Self-Healing DevSecOps Agent
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![AWS](https://img.shields.io/badge/AWS-SageMaker-orange)](https://aws.amazon.com)
@@ -9,9 +9,9 @@
 
 ---
 
-## 🎯 What It Does
+## What It Does
 
-AutoFix is your team's intelligent DevSecOps assistant that:
+CodeHealer is your team's intelligent DevSecOps assistant that:
 
 1. **Monitors** your GitHub `develop` branch via webhooks
 2. **Detects** bugs, security vulnerabilities, and code quality issues using AI
@@ -34,7 +34,7 @@ AutoFix is your team's intelligent DevSecOps assistant that:
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
 graph TD
@@ -97,33 +97,33 @@ graph TD
 
 ---
 
-## 🔄 Decision Flow
+## Decision Flow
 
 AutoFix follows this intelligent priority system:
 
-### 1️⃣ **First: Search Slack** (Priority Source)
+### **First: Search Slack** (Priority Source)
 - Searches channels: `#engineering`, `#code-review`, `#security`
 - Looks for: similar error messages, fix discussions, code snippets
 - If found: Uses team's proven solution
 
-### 2️⃣ **Second: Search Vector Database**
+### **Second: Search Vector Database**
 - Checks past fixes from AutoFix history
 - Retrieves similar code patterns and solutions
 - If found: Applies learned pattern
 
-### 3️⃣ **Third: Generate with AI**
+### **Third: Generate with AI**
 - Uses Llama 3.1 to generate new fix
 - Validates safety and correctness
 - If confident: Creates PR
 
-### 4️⃣ **Last: Escalate to Senior Dev**
+### **Last: Escalate to Senior Dev**
 - Complex issues that need human judgment
 - Low confidence fixes
 - Posts detailed analysis to Slack with `@senior-dev` mention
 
 ---
 
-## 🚀 Quick Install
+## Quick Install
 
 ### Prerequisites
 - AWS Account with SageMaker access
@@ -136,8 +136,8 @@ AutoFix follows this intelligent priority system:
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/your-org/autofix.git
-cd autofix
+git clone https://github.com/sinhaparth5/code-healer.git
+cd code-healer
 pip install -r requirements.txt
 
 # 2. Configure credentials
@@ -178,12 +178,12 @@ git push origin develop
 # 1. AutoFix analyzes the code (SQL injection detected)
 # 2. Searches Slack for similar fixes
 # 3. Creates PR with fix
-# 4. Posts to Slack: "🤖 Fixed SQL injection in app.py"
+# 4. Posts to Slack: "Fixed SQL injection in app.py"
 ```
 
 ---
 
-## 📊 What AutoFix Catches
+## What AutoFix Catches
 
 | Category | Examples |
 |----------|----------|
@@ -193,14 +193,14 @@ git push origin develop
 
 ---
 
-## 💬 Slack Integration Features
+## Slack Integration Features
 
 ### Automatic Notifications
 
 **When fix is applied:**
 ```
-🤖 AutoFix Bot
-✅ Auto-fixed SQL injection vulnerability in auth.py
+CodeHealer Bot
+Auto-fixed SQL injection vulnerability in auth.py
 
 File: src/auth.py
 Issue: SQL Injection (Critical)
@@ -213,8 +213,8 @@ Similar fix previously discussed: https://slack.com/archives/C123/p1234567890
 
 **When escalation needed:**
 ```
-🤖 AutoFix Bot
-⚠️ @senior-dev - Manual review needed
+CodeHealer Bot
+@senior-dev - Manual review needed
 
 File: src/payment.py
 Issue: Potential race condition in transaction handler
@@ -224,7 +224,7 @@ Confidence: 62%
 I found a potential issue but I'm not confident enough to auto-fix.
 Draft PR created with analysis: #457
 
-Could you review? 🙏
+Could you review?
 ```
 
 ### Slack Commands (Optional)
@@ -251,7 +251,7 @@ Could you review? 🙏
 
 ---
 
-## 📈 Results from Beta Testing
+## Results from Beta Testing
 
 - **127 fixes** applied automatically in 30 days
 - **89 solutions** found from Slack history (70% reuse rate!)
@@ -262,7 +262,7 @@ Could you review? 🙏
 
 ---
 
-## 🎯 Why This Approach Works
+## Why This Approach Works
 
 ### Traditional Static Analysis Tools
 - ❌ Generate too many false positives
@@ -278,10 +278,10 @@ Could you review? 🙏
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
-autofix/
+code-healer/
 ├── src/
 │   ├── lambda_handler.py      # Main webhook handler
 │   ├── agent/
@@ -308,7 +308,7 @@ autofix/
 
 ---
 
-## 🔐 Security & Privacy
+## Security & Privacy
 
 - ✅ **Code never leaves your AWS environment**
 - ✅ **Slack messages are only searched, never modified**
@@ -319,24 +319,15 @@ autofix/
 
 ---
 
-## 📝 License
+## License
 
 Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 This is a hackathon project! Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
----
-
-## 🏆 Hackathon Submission
-
-**Built for:** [Hackathon Name]  
-**Team:** [Your Team Name]  
-**Demo:** [Link to demo video]  
-**Slides:** [Link to presentation]
 
 ---
 
