@@ -1,0 +1,49 @@
+# AWS Services
+boto3
+botocore
+
+# Slack Integration
+slack-sdk
+
+# GitHub Integration
+PyGithub
+
+# OpenSearch (Vector Database)
+opensearch-py
+
+# LLM Orchestration
+langchain
+langchain-community
+
+# HTTP & API
+requests
+urllib3
+
+# Data Processing
+numpy
+pandas
+
+# Environment & Configuration
+python-dotenv
+pydantic
+pydantic-settings
+
+# Testing
+pytest
+pytest-cov
+pytest-mock
+moto
+
+# Code Quality
+black
+flake8
+mypy
+pylint
+
+# Security
+cryptography
+python-jose
+
+# Utilities
+jsonschema
+tenacity
