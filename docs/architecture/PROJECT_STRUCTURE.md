@@ -2,183 +2,183 @@
 
 Complete folder organization for CI/CD pipeline failure auto-remediation system.
 
-## ?? Directory Tree
+## Directory Tree
 
 ```
 codehealer/
-³
-ÃÄÄ .github/
-³   ÀÄÄ workflows/
-³       ÃÄÄ ci.yml                      # Run tests on PR
-³       ÃÄÄ deploy-dev.yml              # Deploy to dev environment
-³       ÀÄÄ deploy-prod.yml             # Deploy to production
-³
-ÃÄÄ src/                                # Python Lambda code
-³   ÃÄÄ __init__.py
-³   ÃÄÄ lambda_handler.py               # Main webhook entry point
-³   ³
-³   ÃÄÄ agent/                          # Core analysis logic
-³   ³   ÃÄÄ __init__.py
-³   ³   ÃÄÄ analyzer.py                 # Failure classification
-³   ³   ÃÄÄ confidence_scorer.py        # Confidence calculation
-³   ³   ÀÄÄ decision_engine.py          # Auto-fix vs escalate
-³   ³
-³   ÃÄÄ integrations/                   # External platform APIs
-³   ³   ÃÄÄ __init__.py
-³   ³   ÃÄÄ github_client.py            # GitHub Actions API
-³   ³   ÃÄÄ argocd_client.py            # ArgoCD API
-³   ³   ÃÄÄ kubernetes_client.py        # K8s API
-³   ³   ÃÄÄ slack_client.py             # Slack search + notify
-³   ³   ÀÄÄ sagemaker_client.py         # SageMaker inference
-³   ³
-³   ÃÄÄ resolvers/                      # Remediation actions
-³   ³   ÃÄÄ __init__.py
-³   ³   ÃÄÄ config_fixer.py             # YAML/JSON fixes
-³   ³   ÃÄÄ credential_refresher.py     # Token rotation
-³   ³   ÃÄÄ resource_scaler.py          # K8s resource updates
-³   ³   ÀÄÄ retry_handler.py            # Exponential backoff
-³   ³
-³   ÀÄÄ utils/                          # Utilities
-³       ÃÄÄ __init__.py
-³       ÃÄÄ config.py                   # Environment config
-³       ÃÄÄ logger.py                   # JSON logging
-³       ÃÄÄ embeddings.py               # Vector generation
-³       ÀÄÄ prompts.py                  # LLM prompt templates
-³
-ÃÄÄ terraform/                          # Infrastructure as Code
-³   ÃÄÄ main.tf                         # Root module
-³   ÃÄÄ variables.tf                    # Input variables
-³   ÃÄÄ outputs.tf                      # Output values
-³   ÃÄÄ backend.tf                      # S3 state backend
-³   ÃÄÄ terraform.tfvars.example        # Config template
-³   ÃÄÄ README.md                       # Deployment guide
-³   ³
-³   ÃÄÄ environments/                   # Environment-specific
-³   ³   ÃÄÄ dev.tfvars
-³   ³   ÃÄÄ staging.tfvars
-³   ³   ÀÄÄ prod.tfvars
-³   ³
-³   ÀÄÄ modules/                        # Reusable modules
-³       ÃÄÄ api_gateway/                # Webhook endpoint
-³       ³   ÃÄÄ main.tf
-³       ³   ÃÄÄ variables.tf
-³       ³   ÃÄÄ outputs.tf
-³       ³   ÀÄÄ README.md
-³       ³
-³       ÃÄÄ lambda/                     # Lambda function
-³       ³   ÃÄÄ main.tf
-³       ³   ÃÄÄ variables.tf
-³       ³   ÃÄÄ outputs.tf
-³       ³   ÀÄÄ README.md
-³       ³
-³       ÃÄÄ sagemaker/                  # NIM endpoints
-³       ³   ÃÄÄ main.tf
-³       ³   ÃÄÄ variables.tf
-³       ³   ÃÄÄ outputs.tf
-³       ³   ÀÄÄ README.md
-³       ³
-³       ÃÄÄ opensearch/                 # Vector database
-³       ³   ÃÄÄ main.tf
-³       ³   ÃÄÄ variables.tf
-³       ³   ÃÄÄ outputs.tf
-³       ³   ÀÄÄ README.md
-³       ³
-³       ÃÄÄ dynamodb/                   # Audit trail
-³       ³   ÃÄÄ main.tf
-³       ³   ÃÄÄ variables.tf
-³       ³   ÀÄÄ outputs.tf
-³       ³
-³       ÀÄÄ iam/                        # Roles and policies
-³           ÃÄÄ main.tf
-³           ÃÄÄ variables.tf
-³           ÀÄÄ outputs.tf
-³
-ÃÄÄ tests/                              # Test suite
-³   ÃÄÄ __init__.py
-³   ³
-³   ÃÄÄ unit/                           # Unit tests
-³   ³   ÃÄÄ __init__.py
-³   ³   ÃÄÄ test_lambda_handler.py
-³   ³   ÃÄÄ test_analyzer.py
-³   ³   ÃÄÄ test_github_client.py
-³   ³   ÀÄÄ test_confidence_scorer.py
-³   ³
-³   ÃÄÄ integration/                    # Integration tests
-³   ³   ÃÄÄ __init__.py
-³   ³   ÃÄÄ test_end_to_end.py
-³   ³   ÀÄÄ test_slack_integration.py
-³   ³
-³   ÀÄÄ fixtures/                       # Test data
-³       ÃÄÄ github_webhook_payloads/
-³       ÃÄÄ argocd_events/
-³       ÀÄÄ k8s_pod_failures/
-³
-ÃÄÄ scripts/                            # Utility scripts
-³   ÃÄÄ bootstrap_terraform.sh          # Setup S3 backend
-³   ÃÄÄ deploy.sh                       # Package + deploy
-³   ÃÄÄ test_webhook.sh                 # Test webhook endpoint
-³   ÀÄÄ simulate_failure.sh             # Generate test failures
-³
-ÃÄÄ docs/                               # Documentation
-³   ÃÄÄ paper.pdf                       # Technical paper (LaTeX)
-³   ÃÄÄ paper.tex                       # LaTeX source
-³   ÃÄÄ images/                         # Diagrams (Mermaid PNGs)
-³   ³   ÃÄÄ codehealer_architecture.png
-³   ³   ÀÄÄ codehealer_workflow.png
-³   ³
-³   ÃÄÄ guides/                         # User guides
-³   ³   ÃÄÄ getting-started.md
-³   ³   ÃÄÄ slack-setup.md
-³   ³   ÃÄÄ github-actions-integration.md
-³   ³   ÀÄÄ argocd-integration.md
-³   ³
-³   ÃÄÄ api/                            # API documentation
-³   ³   ÃÄÄ webhook-payload.md
-³   ³   ÃÄÄ remediation-actions.md
-³   ³   ÀÄÄ confidence-scoring.md
-³   ³
-³   ÀÄÄ architecture/
-³       ÀÄÄ SYSTEM_ARCHITECTURE_SUMMARY.md
-³
-ÃÄÄ deployment/                         # Deployment artifacts
-³   ÃÄÄ lambda_package.zip              # Generated Lambda zip
-³   ÀÄÄ lambda_layers/                  # Python dependencies
-³       ÀÄÄ requirements/
-³
-ÃÄÄ config/                             # Configuration files
-³   ÃÄÄ failure_patterns.yaml           # Known failure patterns
-³   ÃÄÄ remediation_rules.yaml          # Fix strategies
-³   ÀÄÄ slack_channels.yaml             # Channels to search
-³
-ÃÄÄ examples/                           # Example configurations
-³   ÃÄÄ github-workflow-failures/
-³   ³   ÃÄÄ expired-token.yml
-³   ³   ÃÄÄ image-pull-error.yml
-³   ³   ÀÄÄ resource-limit.yml
-³   ³
-³   ÀÄÄ argocd-failures/
-³       ÃÄÄ manifest-error.yml
-³       ÀÄÄ sync-timeout.yml
-³
-ÃÄÄ .github/                            # GitHub specific
-³   ÃÄÄ ISSUE_TEMPLATE/
-³   ÃÄÄ PULL_REQUEST_TEMPLATE.md
-³   ÀÄÄ workflows/
-³
-ÃÄÄ .gitignore                          # Git ignore rules
-ÃÄÄ .env.example                        # Environment template
-ÃÄÄ requirements.txt                    # Python dependencies
-ÃÄÄ requirements-dev.txt                # Dev dependencies
-ÃÄÄ setup.py                            # Python package setup
-ÃÄÄ Makefile                            # Build automation
-ÃÄÄ docker-compose.yml                  # Local development
-ÃÄÄ README.md                           # Main readme
-ÃÄÄ CONTRIBUTING.md                     # Contribution guide
-ÃÄÄ LICENSE                             # Apache 2.0
-ÀÄÄ CHANGELOG.md                        # Version history
+â”‚
+â”œâ”€â”€ .github/
+â”‚   â””â”€â”€ workflows/
+â”‚       â”œâ”€â”€ ci.yml                      # Run tests on PR
+â”‚       â”œâ”€â”€ deploy-dev.yml              # Deploy to dev environment
+â”‚       â””â”€â”€ deploy-prod.yml             # Deploy to production
+â”‚
+â”œâ”€â”€ src/                                # Python Lambda code
+â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”œâ”€â”€ lambda_handler.py               # Main webhook entry point
+â”‚   â”‚
+â”‚   â”œâ”€â”€ agent/                          # Core analysis logic
+â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”œâ”€â”€ analyzer.py                 # Failure classification
+â”‚   â”‚   â”œâ”€â”€ confidence_scorer.py        # Confidence calculation
+â”‚   â”‚   â””â”€â”€ decision_engine.py          # Auto-fix vs escalate
+â”‚   â”‚
+â”‚   â”œâ”€â”€ integrations/                   # External platform APIs
+â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”œâ”€â”€ github_client.py            # GitHub Actions API
+â”‚   â”‚   â”œâ”€â”€ argocd_client.py            # ArgoCD API
+â”‚   â”‚   â”œâ”€â”€ kubernetes_client.py        # K8s API
+â”‚   â”‚   â”œâ”€â”€ slack_client.py             # Slack search + notify
+â”‚   â”‚   â””â”€â”€ sagemaker_client.py         # SageMaker inference
+â”‚   â”‚
+â”‚   â”œâ”€â”€ resolvers/                      # Remediation actions
+â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”œâ”€â”€ config_fixer.py             # YAML/JSON fixes
+â”‚   â”‚   â”œâ”€â”€ credential_refresher.py     # Token rotation
+â”‚   â”‚   â”œâ”€â”€ resource_scaler.py          # K8s resource updates
+â”‚   â”‚   â””â”€â”€ retry_handler.py            # Exponential backoff
+â”‚   â”‚
+â”‚   â””â”€â”€ utils/                          # Utilities
+â”‚       â”œâ”€â”€ __init__.py
+â”‚       â”œâ”€â”€ config.py                   # Environment config
+â”‚       â”œâ”€â”€ logger.py                   # JSON logging
+â”‚       â”œâ”€â”€ embeddings.py               # Vector generation
+â”‚       â””â”€â”€ prompts.py                  # LLM prompt templates
+â”‚
+â”œâ”€â”€ terraform/                          # Infrastructure as Code
+â”‚   â”œâ”€â”€ main.tf                         # Root module
+â”‚   â”œâ”€â”€ variables.tf                    # Input variables
+â”‚   â”œâ”€â”€ outputs.tf                      # Output values
+â”‚   â”œâ”€â”€ backend.tf                      # S3 state backend
+â”‚   â”œâ”€â”€ terraform.tfvars.example        # Config template
+â”‚   â”œâ”€â”€ README.md                       # Deployment guide
+â”‚   â”‚
+â”‚   â”œâ”€â”€ environments/                   # Environment-specific
+â”‚   â”‚   â”œâ”€â”€ dev.tfvars
+â”‚   â”‚   â”œâ”€â”€ staging.tfvars
+â”‚   â”‚   â””â”€â”€ prod.tfvars
+â”‚   â”‚
+â”‚   â””â”€â”€ modules/                        # Reusable modules
+â”‚       â”œâ”€â”€ api_gateway/                # Webhook endpoint
+â”‚       â”‚   â”œâ”€â”€ main.tf
+â”‚       â”‚   â”œâ”€â”€ variables.tf
+â”‚       â”‚   â”œâ”€â”€ outputs.tf
+â”‚       â”‚   â””â”€â”€ README.md
+â”‚       â”‚
+â”‚       â”œâ”€â”€ lambda/                     # Lambda function
+â”‚       â”‚   â”œâ”€â”€ main.tf
+â”‚       â”‚   â”œâ”€â”€ variables.tf
+â”‚       â”‚   â”œâ”€â”€ outputs.tf
+â”‚       â”‚   â””â”€â”€ README.md
+â”‚       â”‚
+â”‚       â”œâ”€â”€ sagemaker/                  # NIM endpoints
+â”‚       â”‚   â”œâ”€â”€ main.tf
+â”‚       â”‚   â”œâ”€â”€ variables.tf
+â”‚       â”‚   â”œâ”€â”€ outputs.tf
+â”‚       â”‚   â””â”€â”€ README.md
+â”‚       â”‚
+â”‚       â”œâ”€â”€ opensearch/                 # Vector database
+â”‚       â”‚   â”œâ”€â”€ main.tf
+â”‚       â”‚   â”œâ”€â”€ variables.tf
+â”‚       â”‚   â”œâ”€â”€ outputs.tf
+â”‚       â”‚   â””â”€â”€ README.md
+â”‚       â”‚
+â”‚       â”œâ”€â”€ dynamodb/                   # Audit trail
+â”‚       â”‚   â”œâ”€â”€ main.tf
+â”‚       â”‚   â”œâ”€â”€ variables.tf
+â”‚       â”‚   â””â”€â”€ outputs.tf
+â”‚       â”‚
+â”‚       â””â”€â”€ iam/                        # Roles and policies
+â”‚           â”œâ”€â”€ main.tf
+â”‚           â”œâ”€â”€ variables.tf
+â”‚           â””â”€â”€ outputs.tf
+â”‚
+â”œâ”€â”€ tests/                              # Test suite
+â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚
+â”‚   â”œâ”€â”€ unit/                           # Unit tests
+â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”œâ”€â”€ test_lambda_handler.py
+â”‚   â”‚   â”œâ”€â”€ test_analyzer.py
+â”‚   â”‚   â”œâ”€â”€ test_github_client.py
+â”‚   â”‚   â””â”€â”€ test_confidence_scorer.py
+â”‚   â”‚
+â”‚   â”œâ”€â”€ integration/                    # Integration tests
+â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”œâ”€â”€ test_end_to_end.py
+â”‚   â”‚   â””â”€â”€ test_slack_integration.py
+â”‚   â”‚
+â”‚   â””â”€â”€ fixtures/                       # Test data
+â”‚       â”œâ”€â”€ github_webhook_payloads/
+â”‚       â”œâ”€â”€ argocd_events/
+â”‚       â””â”€â”€ k8s_pod_failures/
+â”‚
+â”œâ”€â”€ scripts/                            # Utility scripts
+â”‚   â”œâ”€â”€ bootstrap_terraform.sh          # Setup S3 backend
+â”‚   â”œâ”€â”€ deploy.sh                       # Package + deploy
+â”‚   â”œâ”€â”€ test_webhook.sh                 # Test webhook endpoint
+â”‚   â””â”€â”€ simulate_failure.sh             # Generate test failures
+â”‚
+â”œâ”€â”€ docs/                               # Documentation
+â”‚   â”œâ”€â”€ paper.pdf                       # Technical paper (LaTeX)
+â”‚   â”œâ”€â”€ paper.tex                       # LaTeX source
+â”‚   â”œâ”€â”€ images/                         # Diagrams (Mermaid PNGs)
+â”‚   â”‚   â”œâ”€â”€ codehealer_architecture.png
+â”‚   â”‚   â””â”€â”€ codehealer_workflow.png
+â”‚   â”‚
+â”‚   â”œâ”€â”€ guides/                         # User guides
+â”‚   â”‚   â”œâ”€â”€ getting-started.md
+â”‚   â”‚   â”œâ”€â”€ slack-setup.md
+â”‚   â”‚   â”œâ”€â”€ github-actions-integration.md
+â”‚   â”‚   â””â”€â”€ argocd-integration.md
+â”‚   â”‚
+â”‚   â”œâ”€â”€ api/                            # API documentation
+â”‚   â”‚   â”œâ”€â”€ webhook-payload.md
+â”‚   â”‚   â”œâ”€â”€ remediation-actions.md
+â”‚   â”‚   â””â”€â”€ confidence-scoring.md
+â”‚   â”‚
+â”‚   â””â”€â”€ architecture/
+â”‚       â””â”€â”€ SYSTEM_ARCHITECTURE_SUMMARY.md
+â”‚
+â”œâ”€â”€ deployment/                         # Deployment artifacts
+â”‚   â”œâ”€â”€ lambda_package.zip              # Generated Lambda zip
+â”‚   â””â”€â”€ lambda_layers/                  # Python dependencies
+â”‚       â””â”€â”€ requirements/
+â”‚
+â”œâ”€â”€ config/                             # Configuration files
+â”‚   â”œâ”€â”€ failure_patterns.yaml           # Known failure patterns
+â”‚   â”œâ”€â”€ remediation_rules.yaml          # Fix strategies
+â”‚   â””â”€â”€ slack_channels.yaml             # Channels to search
+â”‚
+â”œâ”€â”€ examples/                           # Example configurations
+â”‚   â”œâ”€â”€ github-workflow-failures/
+â”‚   â”‚   â”œâ”€â”€ expired-token.yml
+â”‚   â”‚   â”œâ”€â”€ image-pull-error.yml
+â”‚   â”‚   â””â”€â”€ resource-limit.yml
+â”‚   â”‚
+â”‚   â””â”€â”€ argocd-failures/
+â”‚       â”œâ”€â”€ manifest-error.yml
+â”‚       â””â”€â”€ sync-timeout.yml
+â”‚
+â”œâ”€â”€ .github/                            # GitHub specific
+â”‚   â”œâ”€â”€ ISSUE_TEMPLATE/
+â”‚   â”œâ”€â”€ PULL_REQUEST_TEMPLATE.md
+â”‚   â””â”€â”€ workflows/
+â”‚
+â”œâ”€â”€ .gitignore                          # Git ignore rules
+â”œâ”€â”€ .env.example                        # Environment template
+â”œâ”€â”€ requirements.txt                    # Python dependencies
+â”œâ”€â”€ requirements-dev.txt                # Dev dependencies
+â”œâ”€â”€ setup.py                            # Python package setup
+â”œâ”€â”€ Makefile                            # Build automation
+â”œâ”€â”€ docker-compose.yml                  # Local development
+â”œâ”€â”€ README.md                           # Main readme
+â”œâ”€â”€ CONTRIBUTING.md                     # Contribution guide
+â”œâ”€â”€ LICENSE                             # Apache 2.0
+â””â”€â”€ CHANGELOG.md                        # Version history
 ```
 
-## ?? Key Files
+## Key Files
 
 ### Configuration
 - **`.env.example`** - Template for environment variables
@@ -201,7 +201,7 @@ codehealer/
 - **`docs/guides/`** - Step-by-step integration guides
 - **`README.md`** - Quick start and overview
 
-## ?? File Purposes
+## ğŸ”§ File Purposes
 
 ### `lambda_handler.py`
 Main entry point for webhook events. Routes to appropriate failure analyzer based on source (GitHub Actions, ArgoCD, Kubernetes).
@@ -249,7 +249,7 @@ Manages resource constraints:
 - Scale deployments
 - Request quota increases
 
-## ?? Usage Patterns
+## Usage Patterns
 
 ### Local Development
 ```bash
@@ -284,7 +284,7 @@ pytest tests/integration/
 ./scripts/simulate_failure.sh github-actions expired-token
 ```
 
-## ?? Dependencies
+## Dependencies
 
 ### Python (requirements.txt)
 - `boto3` - AWS SDK
@@ -298,7 +298,7 @@ pytest tests/integration/
 - AWS Provider ~> 5.0
 - Terraform >= 1.5.0
 
-## ?? Secrets Management
+## Secrets Management
 
 All secrets stored in AWS Secrets Manager:
 - `codehealer/github-token`
@@ -308,7 +308,7 @@ All secrets stored in AWS Secrets Manager:
 
 Never commit secrets to Git!
 
-## ?? Generated Files
+##  Generated Files
 
 These files are generated and should not be committed:
 - `deployment/lambda_package.zip`
