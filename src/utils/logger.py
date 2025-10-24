@@ -126,7 +126,6 @@ def log_remediation(
         logger: logging.Logger,
         incident_id: str,
         action: str,
-    action: str,
     status: str,
     confidence: float,
     **kwargs: Any
@@ -242,14 +241,14 @@ class LoggerAdapter(logging.LoggerAdapter):
             kwargs["extra"] = self.extra
         return msg, kwargs
 
-def get_adapter(logger: logging.Logger, **context: Any) LoggerAdapter:
+def get_adapter(logger: logging.Logger, **context: Any) -> LoggerAdapter:
     return LoggerAdapter(logger, context)
 
 def mask_sensitive_data(data: Dict[str, Any], sensitive_keys: list = None) -> Dict[str, Any]:
     if sensitive_keys is None:
         sensitive_keys = ["password", "token", "secret", "key", "credential", "authorization"]
 
-    masked = {}
+    masked_data = {}
     for key, value in data.items():
         if any(sensitive in key.lower() for sensitive in sensitive_keys):
             masked_data[key] = "***REDACTED***"
