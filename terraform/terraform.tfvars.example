@@ -1,0 +1,18 @@
+project_name = "codehealer"
+environment  = "dev"
+aws_region   = "us-east-1"
+
+vpc_id     = "vpc-xxxxxxxxx"
+subnet_ids = ["subnet-xxxxxxxxx", "subnet-yyyyyyyyy"]
+
+opensearch_allowed_cidr_blocks = ["10.0.0.0/16"]
+
+sagemaker_llm_container_image       = "763104351884.dkr.ecr.us-east-1.amazonaws.com/huggingface-pytorch-inference:2.0.0-transformers4.28.1-gpu-py310-cu118-ubuntu20.04"
+sagemaker_embedding_container_image = "763104351884.dkr.ecr.us-east-1.amazonaws.com/huggingface-pytorch-inference:2.0.0-transformers4.28.1-gpu-py310-cu118-ubuntu20.04"
+
+alert_email = "alerts@example.com"
+
+tags = {
+  Owner = "DevOps"
+  Team  = "Platform"
+}
