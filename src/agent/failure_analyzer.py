@@ -2,7 +2,7 @@ import json
 import re
 import asyncio
 import requests
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 from datetime import datetime
 from dataclasses import dataclass
 

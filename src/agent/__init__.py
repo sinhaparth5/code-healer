@@ -1,7 +1,3 @@
-"""
-CodeHealer Agent Package - Autonomous deployment failure resolution
-"""
-
 from .core_agent import (
     CodeHealerAgent,
     IncidentEvent,

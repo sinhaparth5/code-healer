@@ -1,7 +1,7 @@
 import json
 import re
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
 
@@ -26,7 +26,6 @@ class EventSeverity(Enum):
 
 @dataclass
 class ParsedEventMetadata:
-    """Metadata extracted from raw event"""
     source: EventSource
     event_type: str
     severity: EventSeverity
@@ -120,8 +119,6 @@ class EventProcessor:
         raw_event: Dict[str, Any], 
         headers: Dict[str, str]
     ) -> EventSource:
-        """Identify the source platform of the webhook event"""
-        
         user_agent = headers.get("user-agent", "").lower()
         if "github" in user_agent:
             return EventSource.GITHUB_ACTIONS
@@ -144,8 +141,6 @@ class EventProcessor:
         return EventSource.UNKNOWN
 
     def _is_failure_event(self, raw_event: Dict[str, Any], source: EventSource) -> bool:
-        """Determine if this event represents a failure"""
-        
         if source == EventSource.GITHUB_ACTIONS:
             workflow_run = raw_event.get("workflow_run", {})
             return (
@@ -182,8 +177,6 @@ class EventProcessor:
         raw_event: Dict[str, Any], 
         source: EventSource
     ) -> ParsedEventMetadata:
-        """Extract structured metadata from raw event"""
-        
         if source == EventSource.GITHUB_ACTIONS:
             return self._extract_github_metadata(raw_event)
         elif source == EventSource.ARGOCD:
@@ -198,7 +191,6 @@ class EventProcessor:
             return self._extract_default_metadata(raw_event, source)
 
     def _extract_github_metadata(self, raw_event: Dict[str, Any]) -> ParsedEventMetadata:
-        """Extract metadata from GitHub Actions event"""
         workflow_run = raw_event.get("workflow_run", {})
         repository = raw_event.get("repository", {})
         
@@ -224,7 +216,6 @@ class EventProcessor:
         )
 
     def _extract_argocd_metadata(self, raw_event: Dict[str, Any]) -> ParsedEventMetadata:
-        """Extract metadata from ArgoCD event"""
         application = raw_event.get("application", {})
         metadata = application.get("metadata", {})
         status = application.get("status", {})
@@ -251,7 +242,6 @@ class EventProcessor:
         )
 
     def _extract_kubernetes_metadata(self, raw_event: Dict[str, Any]) -> ParsedEventMetadata:
-        """Extract metadata from Kubernetes event"""
         involved_object = raw_event.get("involvedObject", {})
         metadata = raw_event.get("metadata", {})
         
@@ -280,7 +270,6 @@ class EventProcessor:
         )
 
     def _extract_prometheus_metadata(self, raw_event: Dict[str, Any]) -> ParsedEventMetadata:
-        """Extract metadata from Prometheus alert"""
         alerts = raw_event.get("alerts", [])
         if not alerts:
             return self._extract_default_metadata(raw_event, EventSource.PROMETHEUS)
@@ -344,7 +333,6 @@ class EventProcessor:
         raw_event: Dict[str, Any], 
         source: EventSource
     ) -> ParsedEventMetadata:
-        """Extract default metadata for unknown event types"""
         return ParsedEventMetadata(
             source=source,
             event_type="unknown_failure",
@@ -359,7 +347,6 @@ class EventProcessor:
         )
 
     def _infer_environment(self, text: str) -> str:
-        """Infer environment from text (branch, namespace, etc.)"""
         if not text:
             return "unknown"
         
@@ -373,7 +360,6 @@ class EventProcessor:
         return "unknown"
 
     def _extract_service_name(self, text: str) -> str:
-        """Extract service name using regex patterns"""
         if not text:
             return "unknown"
         
@@ -394,8 +380,6 @@ class EventProcessor:
         source: EventSource, 
         metadata: ParsedEventMetadata
     ) -> str:
-        """Extract detailed error logs from the event"""
-        
         if source == EventSource.GITHUB_ACTIONS:
             return await self._extract_github_error_logs(raw_event, metadata)
         elif source == EventSource.ARGOCD:
@@ -414,7 +398,6 @@ class EventProcessor:
         raw_event: Dict[str, Any], 
         metadata: ParsedEventMetadata
     ) -> str:
-        """Extract GitHub Actions error logs"""
         workflow_run = raw_event.get("workflow_run", {})
         
         error_info = f"""GitHub Actions Workflow Failure
@@ -433,7 +416,6 @@ Message: {workflow_run.get('head_commit', {}).get('message', 'N/A')}
         return error_info
 
     def _extract_argocd_error_logs(self, raw_event: Dict[str, Any]) -> str:
-        """Extract ArgoCD error logs"""
         application = raw_event.get("application", {})
         status = application.get("status", {})
         
@@ -467,7 +449,6 @@ Conditions:
         return error_info
 
     def _extract_kubernetes_error_logs(self, raw_event: Dict[str, Any]) -> str:
-        """Extract Kubernetes event error logs"""
         involved_object = raw_event.get("involvedObject", {})
         
         error_info = f"""Kubernetes Event
@@ -488,7 +469,6 @@ Source: {raw_event.get('source', {}).get('component', 'unknown')}
         return error_info
 
     def _extract_prometheus_error_logs(self, raw_event: Dict[str, Any]) -> str:
-        """Extract Prometheus alert error logs"""
         alerts = raw_event.get("alerts", [])
         
         error_info = "Prometheus Alert(s) Firing\n\n"
@@ -516,7 +496,6 @@ Labels:
         return error_info
 
     def _extract_jenkins_error_logs(self, raw_event: Dict[str, Any]) -> str:
-        """Extract Jenkins build error logs"""
         build = raw_event.get("build", {})
         
         error_info = f"""Jenkins Build Failure
@@ -549,8 +528,6 @@ Parameters:
         source: EventSource, 
         metadata: ParsedEventMetadata
     ) -> Dict[str, Any]:
-        """Gather additional system state information"""
-        
         system_state = {
             "timestamp": datetime.utcnow().isoformat(),
             "event_source": source.value,
@@ -587,8 +564,6 @@ Parameters:
         return system_state
 
     def _classify_failure_type(self, raw_event: Dict[str, Any], source: EventSource) -> str:
-        """Classify the type of failure for initial categorization"""
-        
         if source == EventSource.GITHUB_ACTIONS:
             workflow_run = raw_event.get("workflow_run", {})
             conclusion = workflow_run.get("conclusion", "")
@@ -632,7 +607,6 @@ Parameters:
             return "unknown_failure"
 
     def _build_context(self, metadata: ParsedEventMetadata) -> Dict[str, Any]:
-        """Build context dictionary from metadata"""
         return {
             "environment": metadata.environment,
             "service": metadata.service,
@@ -650,7 +624,6 @@ Parameters:
         signature: str, 
         secret: str
     ) -> bool:
-        """Validate webhook signature for security"""
         import hmac
         import hashlib
         
@@ -671,7 +644,6 @@ Parameters:
             return False
 
     def get_processing_statistics(self) -> Dict[str, Any]:
-        """Get event processing statistics"""
         return {
             "events_processed": 0,
             "by_source": {source.value: 0 for source in EventSource},

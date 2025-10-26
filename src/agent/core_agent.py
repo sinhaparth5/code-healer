@@ -1,4 +1,3 @@
-import asyncio
 import json
 import uuid
 from datetime import datetime, timedelta
@@ -33,7 +32,6 @@ class ResolutionSource(Enum):
 
 @dataclass
 class IncidentEvent:
-    """Normalized incident event structure"""
     incident_id: str
     timestamp: datetime
     source: str
@@ -46,7 +44,6 @@ class IncidentEvent:
 
 @dataclass
 class FailureAnalysis:
-    """Result of failure analysis"""
     incident_id: str
     primary_category: FailureCategory
     subcategory: str
@@ -59,7 +56,6 @@ class FailureAnalysis:
 
 @dataclass
 class ResolutionCandidate:
-    """Potential resolution with confidence scoring"""
     resolution_id: str
     source: ResolutionSource
     description: str
@@ -73,7 +69,6 @@ class ResolutionCandidate:
 
 @dataclass
 class RemediationResult:
-    """Result of automated remediation attempt"""
     incident_id: str
     remediation_id: str
     action_taken: str
@@ -108,7 +103,6 @@ class CodeHealerAgent:
         logger.info("CodeHealer Agent initialized")
 
     def _init_clients(self):
-        """Initialize integration clients"""
         try:
             if github_token := self.config.get("github", {}).get("token"):
                 self.github_client = GitHubClient(github_token)
@@ -132,7 +126,6 @@ class CodeHealerAgent:
             raise
 
     def _init_agent_components(self):
-        """Initialize agent components"""
         try:
             from .event_processor import EventProcessor
             from .failure_analyzer import FailureAnalyzer
@@ -218,7 +211,6 @@ class CodeHealerAgent:
             return {"status": "error", "message": str(e), "incident_id": incident_id}
 
     async def _normalize_event(self, raw_event: Dict[str, Any], incident_id: str) -> Optional[IncidentEvent]:
-        """Normalize different event types into unified structure"""
         try:
             headers = {}
             incident = await self.event_processor.process_webhook_event(
@@ -230,7 +222,6 @@ class CodeHealerAgent:
             return None
 
     def _extract_context(self, raw_event: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract contextual information from raw event"""
         context = {
             "environment": "unknown",
             "service": "unknown", 
@@ -261,7 +252,6 @@ class CodeHealerAgent:
         return context
 
     def _extract_error_log(self, raw_event: Dict[str, Any]) -> str:
-        """Extract error logs from the event"""
         if "workflow_run" in raw_event:
             return f"GitHub Actions workflow failed: {raw_event.get('workflow_run', {}).get('conclusion', 'unknown')}"
         elif "application" in raw_event:
@@ -270,7 +260,6 @@ class CodeHealerAgent:
             return json.dumps(raw_event, indent=2)
 
     async def _gather_system_state(self, raw_event: Dict[str, Any]) -> Dict[str, Any]:
-        """Gather additional system state information"""
         return {
             "timestamp": datetime.utcnow().isoformat(),
             "active_incidents": len(self.active_incidents),
@@ -280,7 +269,6 @@ class CodeHealerAgent:
         }
 
     async def _analyze_failure(self, incident: IncidentEvent) -> Optional[FailureAnalysis]:
-        """Analyze failure using FailureAnalyzer"""
         return await self.failure_analyzer.analyze_failure(incident)
 
     async def _retrieve_solutions(
@@ -288,7 +276,6 @@ class CodeHealerAgent:
         incident: IncidentEvent, 
         analysis: FailureAnalysis
     ) -> List[ResolutionCandidate]:
-        """Retrieve potential solutions using KnowledgeRetriever"""
         return await self.knowledge_retriever.retrieve_solutions(incident, analysis)
 
     async def _make_remediation_decision(
@@ -297,7 +284,6 @@ class CodeHealerAgent:
         analysis: FailureAnalysis,
         candidates: List[ResolutionCandidate]
     ) -> Dict[str, Any]:
-        """Make decision on whether and how to remediate"""
         logger.info(f"Making remediation decision for incident: {incident.incident_id}")
         
         if not candidates:
@@ -326,7 +312,6 @@ class CodeHealerAgent:
         analysis: FailureAnalysis,
         resolution: ResolutionCandidate
     ) -> RemediationResult:
-        """Execute the selected remediation using RemediationCoordinator"""
         return await self.remediation_coordinator.coordinate_remediation(
             incident, analysis, [resolution]
         )
@@ -337,7 +322,6 @@ class CodeHealerAgent:
         analysis: FailureAnalysis,
         remediation_result: Optional[RemediationResult]
     ):
-        """Update tracking systems and learning database using FeedbackSystem"""
         try:
             resolution = None
             if remediation_result and remediation_result.remediation_id != "none":
@@ -366,7 +350,6 @@ class CodeHealerAgent:
         analysis: FailureAnalysis,
         remediation_result: Optional[RemediationResult]
     ):
-        """Send notifications to relevant channels"""
         if not hasattr(self, 'slack_client'):
             return
         
@@ -375,11 +358,11 @@ class CodeHealerAgent:
             
             if remediation_result:
                 if remediation_result.outcome == "success":
-                    action_text = f"✅ Automatically resolved: {remediation_result.action_taken}"
+                    action_text = f"Automatically resolved: {remediation_result.action_taken}"
                 else:
-                    action_text = f"❌ Attempted fix failed: {remediation_result.action_taken}"
+                    action_text = f"Attempted fix failed: {remediation_result.action_taken}"
             else:
-                action_text = "🔍 Escalating to human engineer for investigation"
+                action_text = "Escalating to human engineer for investigation"
             
             self.slack_client.send_incident_notification(
                 channel=channel,
@@ -394,12 +377,10 @@ class CodeHealerAgent:
             logger.error(f"Failed to send notifications: {e}")
 
     def _get_min_confidence_threshold(self, environment: str) -> float:
-        """Get minimum confidence threshold based on environment"""
         thresholds = self.config.get("confidence_thresholds", {})
         return thresholds.get(environment, thresholds.get("default", 0.85))
 
     def _infer_environment_from_branch(self, branch: str) -> str:
-        """Infer environment from git branch name"""
         branch = branch.lower()
         if "prod" in branch or "main" in branch or "master" in branch:
             return "production"
@@ -411,7 +392,6 @@ class CodeHealerAgent:
             return "unknown"
 
     def _infer_environment_from_namespace(self, namespace: str) -> str:
-        """Infer environment from Kubernetes namespace"""
         if not namespace:
             return "unknown"
         namespace = namespace.lower()
@@ -425,7 +405,6 @@ class CodeHealerAgent:
             return "unknown"
 
     async def get_incident_status(self, incident_id: str) -> Optional[Dict[str, Any]]:
-        """Get status of a specific incident"""
         if incident_id in self.active_incidents:
             return {
                 "status": "active",
@@ -440,11 +419,9 @@ class CodeHealerAgent:
             return None
 
     async def list_active_incidents(self) -> List[Dict[str, Any]]:
-        """List all currently active incidents"""
         return list(self.active_incidents.values())
 
     async def get_agent_health(self) -> Dict[str, Any]:
-        """Get health status of the agent"""
         return {
             "status": "healthy",
             "active_incidents": len(self.active_incidents),

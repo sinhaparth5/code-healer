@@ -8,7 +8,7 @@ import hashlib
 from utils.logger import get_logger
 from agent.core_agent import (
     IncidentEvent, FailureAnalysis, ResolutionCandidate, 
-    ResolutionSource, FailureCategory, Fixability
+    ResolutionSource
 )
 
 logger = get_logger(__name__)
