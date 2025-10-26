@@ -1,8 +1,8 @@
 import json
 import uuid
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass
+from datetime import datetime
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass, field
 from enum import Enum
 
 from utils.logger import get_logger
@@ -41,6 +41,7 @@ class IncidentEvent:
     error_log: str
     system_state: Dict[str, Any]
     raw_event: Dict[str, Any]
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 @dataclass
 class FailureAnalysis:
@@ -53,6 +54,8 @@ class FailureAnalysis:
     reasoning: str
     affected_components: List[str]
     recent_changes: List[Dict[str, Any]]
+    summary: str = ""
+    indicators: List[str] = field(default_factory=list)
 
 @dataclass
 class ResolutionCandidate:
