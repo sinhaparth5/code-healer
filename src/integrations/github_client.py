@@ -89,6 +89,15 @@ class GitHubClient:
         except GithubException as e:
             logger.error(f"Failed to create branch: {e}")
             return False
+        
+    def get_file_sha(self, owner: str, repo: str, path: str, ref: str = "main") -> Optional[str]:
+        try:
+            repository = self.client.get_repo(f"{owner}/{repo}")
+            file_content = repository.get_contents(path,ref=ref)
+            return file_content.sha
+        except GithubException as e:
+            logger.error(f"Failed to get file SHA: {e}")
+            return None
 
     def update_file(
         self,
