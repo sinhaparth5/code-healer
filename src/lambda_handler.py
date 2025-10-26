@@ -40,7 +40,7 @@ def validate_webhook_event(payload: Dict[str, Any], event: Dict[str, Any]) -> bo
         logger.warning(f"Unsupproted event: {github_event}")
         return False
     
-    if not all(field in payload for fielld in required_fields):
+    if not all(field in payload for field in required_fields):
         logger.error("Missing required fields in payload")
         return False
 
