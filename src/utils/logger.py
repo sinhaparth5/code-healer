@@ -15,7 +15,7 @@ class JSONFormatter(logging.Formatter):
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "level": record.levelname,
             "logger": record.name,
-            "message": record.getMessage,
+            "message": record.getMessage(),
             "module": record.module,
             "function": record.funcName,
             "line": record.lineno,
@@ -88,7 +88,7 @@ def get_logger(
             "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         )
 
-    handler.setFomatter(formatter)
+    handler.setFormatter(formatter)
     logger.addHandler(handler)
 
     logger.propagate = False
@@ -225,7 +225,7 @@ def setup_lamdba_logging() -> logging.Logger:
         root_logger.removeHandler(handler)
 
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFomatter(JSONFormatter())
+    handler.setFormatter(JSONFormatter())
 
     log_level = os.getenv("LOG_LEVEL", "INFO")
     root_logger.setLevel(getattr(logging, log_level.upper()))

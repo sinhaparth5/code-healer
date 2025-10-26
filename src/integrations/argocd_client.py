@@ -123,7 +123,7 @@ class ArgoCDClient:
 
         result = self._request(
             "POST",
-            f"applications/{app_name}/resouce",
+            f"applications/{app_name}/resource",
             params=params,
             json=patch
         )
@@ -154,7 +154,7 @@ class ArgoCDClient:
             return False
         
         app["spec"].update(spec_updates)
-        result = self._request("PUT", f"applications"/{app_name}, json=app)
+        result = self._request("PUT", f"applications/{app_name}", json=app)
         if result:
             logger.info(f"Updated application spec for {app_name}")
             return True
@@ -175,7 +175,7 @@ class ArgoCDClient:
             return True
         return False
     
-    def get_sync_windows(self, app_name: str) -> Optional[List[str, Any]]:
+    def get_sync_windows(self, app_name: str) -> Optional[List[Dict[str, Any]]]:
         result = self._request("GET", f"applications/{app_name}/syncwindows")
         return result if result else None
     
