@@ -219,7 +219,7 @@ def create_context_logger(name: str, **default_context: Any) -> ContextLogger:
     logger = get_logger(name)
     return ContextLogger(logger, **default_context)
 
-def setup_lamdba_logging() -> logging.Logger:
+def setup_lambda_logging() -> logging.Logger:
     root_logger = logging.getLogger()
     for handler in root_logger.handlers:
         root_logger.removeHandler(handler)
