@@ -56,6 +56,14 @@ class FailureAnalysis:
     recent_changes: List[Dict[str, Any]]
     summary: str = ""
     indicators: List[str] = field(default_factory=list)
+    fix_actions: List[str] = field(default_factory=list)
+    affected_files: List[str] = field(default_factory=list)
+    estimated_fix_time: str = "unknown"
+    auto_fix_steps: List[Dict[str, Any]] = field(default_factory=list)
+    retry_strategy: Dict[str, Any] = field(default_factory=dict)
+    github_actions: Dict[str, Any] = field(default_factory=dict)
+    kubernetes_fixes: Dict[str, Any] = field(default_factory=dict)
+    requires_approval: bool = False
 
 @dataclass
 class ResolutionCandidate:
