@@ -35,7 +35,8 @@ class FailureAnalyzer:
     
     def __init__(self, config_override: Optional[Dict[str, Any]] = None):
         if config_override is None:
-            llm_config = config.get_llm_config()
+            from utils.config import config as global_config
+            llm_config = global_config.get_llm_config()
             config_override = {"llm": llm_config}
         
         self.config = config_override
@@ -59,6 +60,7 @@ class FailureAnalyzer:
     def _load_error_patterns(self) -> List[ErrorPattern]:
         """Load predefined error patterns for quick classification"""
         patterns = [
+            # Configuration Errors
             ErrorPattern(
                 pattern=r"(?i)(yaml|json|yml).*(syntax|parse|invalid|malformed|indent)",
                 category=FailureCategory.CONFIG,
@@ -88,6 +90,7 @@ class FailureAnalyzer:
                 confidence_boost=0.16
             ),
             
+            # Authentication Errors
             ErrorPattern(
                 pattern=r"(?i)(unauthorized|forbidden|access denied|authentication failed|401|403)",
                 category=FailureCategory.AUTH,
@@ -110,6 +113,7 @@ class FailureAnalyzer:
                 confidence_boost=0.14
             ),
             
+            # Resource Constraints
             ErrorPattern(
                 pattern=r"(?i)(oomkilled|out of memory|memory limit|memory.*exceeded)",
                 category=FailureCategory.RESOURCE,
@@ -139,6 +143,7 @@ class FailureAnalyzer:
                 confidence_boost=0.13
             ),
             
+            # Dependency Failures
             ErrorPattern(
                 pattern=r"(?i)(connection.*timeout|network.*timeout|dial.*timeout|i/o timeout)",
                 category=FailureCategory.DEPENDENCY,
@@ -168,6 +173,7 @@ class FailureAnalyzer:
                 confidence_boost=0.09
             ),
             
+            # Environmental Drift
             ErrorPattern(
                 pattern=r"(?i)(state.*inconsistent|drift.*detected|configuration.*drift)",
                 category=FailureCategory.DRIFT,
@@ -188,11 +194,14 @@ class FailureAnalyzer:
 
     async def analyze_failure(self, incident: IncidentEvent) -> Optional[FailureAnalysis]:
         """
-        Comprehensive failure analysis using multiple approaches:
-        1. Fetch detailed logs from GitHub/ArgoCD/Kubernetes
-        2. Use LLM for dynamic error detection and categorization
-        3. Apply pattern matching as fallback
-        4. Determine fixability and confidence
+        Main failure analysis method with enhanced log fetching and LLM integration
+        
+        Process:
+        1. Fetch detailed logs from source platforms
+        2. Perform pattern matching analysis
+        3. Generate comprehensive LLM analysis  
+        4. Combine analyses with confidence weighting
+        5. Extract affected components and recent changes
         
         Args:
             incident: Normalized incident event
@@ -201,35 +210,34 @@ class FailureAnalyzer:
             FailureAnalysis with categorization and remediation guidance
         """
         try:
-            logger.info(f"Starting comprehensive failure analysis for {incident.incident_id}")
+            logger.info(f"Starting enhanced analysis for incident: {incident.incident_id}")
             
-            # Step 1: Fetch detailed logs from source
+            # Step 1: Fetch detailed logs from source platforms
             detailed_logs = await self._fetch_detailed_logs(incident)
             
-            # Step 2: Enhanced pattern matching with detailed logs
-            pattern_match = self._pattern_match_analysis(incident, detailed_logs)
+            # Step 2: Perform pattern matching analysis with detailed logs
+            pattern_analysis = self._pattern_match_analysis(incident, detailed_logs)
             
-            # Step 3: LLM analysis with enhanced context
-            llm_analysis = await self._llm_analysis(incident, detailed_logs)
+            # Step 3: Generate comprehensive LLM analysis  
+            llm_analysis = await self._llm_analysis(incident, detailed_logs, pattern_analysis)
             
-            # Step 4: Combine analyses intelligently
-            final_analysis = self._combine_analyses(incident, pattern_match, llm_analysis)
+            # Step 4: Combine analyses with confidence weighting
+            final_analysis = self._combine_analyses(incident, pattern_analysis, llm_analysis)
             
             # Step 5: Extract affected components and recent changes
-            affected_components = self._extract_affected_components(incident)
-            recent_changes = await self._gather_recent_changes(incident)
+            final_analysis.affected_components = self._extract_affected_components(incident)
+            final_analysis.recent_changes = await self._gather_recent_changes(incident)
             
-            final_analysis.affected_components = affected_components
-            final_analysis.recent_changes = recent_changes
-            
-            logger.info(f"Failure analysis completed for {incident.incident_id}: "
-                       f"{final_analysis.primary_category.value} (confidence: {final_analysis.confidence:.2f})")
+            if final_analysis:
+                logger.info(f"Analysis complete for {incident.incident_id}: "
+                           f"{final_analysis.primary_category.value}/{final_analysis.subcategory} "
+                           f"(confidence: {final_analysis.confidence:.2f}, fixability: {final_analysis.fixability.value})")
             
             return final_analysis
             
         except Exception as e:
-            logger.error(f"Failure analysis failed for {incident.incident_id}: {e}")
-            return None
+            logger.error(f"Failed to analyze incident {incident.incident_id}: {e}", exc_info=True)
+            return self._create_fallback_analysis(incident)
 
     async def _fetch_detailed_logs(self, incident: IncidentEvent) -> str:
         """Fetch detailed logs from the source platform"""
@@ -237,9 +245,9 @@ class FailureAnalyzer:
             if incident.source == "github_actions":
                 return await self._fetch_github_logs(incident)
             elif incident.source == "argocd":
-                return await self._fetch_argocd_logs(incident)
+                return self._fetch_argocd_logs(incident)
             elif incident.source == "kubernetes":
-                return await self._fetch_kubernetes_logs(incident)
+                return self._fetch_kubernetes_logs(incident)
             else:
                 return incident.error_log
         except Exception as e:
@@ -256,19 +264,12 @@ class FailureAnalyzer:
             workflow_run = raw_event["workflow_run"]
             repo_info = raw_event.get("repository", {})
             
-            # Construct GitHub API URLs for detailed log fetching
-            repo_full_name = repo_info.get("full_name", "")
-            run_id = workflow_run.get("id")
-            
-            if not repo_full_name or not run_id:
-                return incident.error_log
-            
             # Enhanced error context with GitHub-specific details
             enhanced_logs = f"""
 === GITHUB WORKFLOW FAILURE ANALYSIS ===
-Repository: {repo_full_name}
+Repository: {repo_info.get("full_name", "Unknown")}
 Workflow: {workflow_run.get('name', 'Unknown')}
-Run ID: {run_id}
+Run ID: {workflow_run.get('id', 'Unknown')}
 Branch: {workflow_run.get('head_branch', 'Unknown')}
 Conclusion: {workflow_run.get('conclusion', 'Unknown')}
 Event: {workflow_run.get('event', 'Unknown')}
@@ -287,16 +288,13 @@ URL: {workflow_run.get('html_url', 'Unknown')}
 {json.dumps(incident.system_state, indent=2) if incident.system_state else 'No system state available'}
 """
             
-            # TODO: Implement actual GitHub API log fetching
-            # This would use GitHub API to get job logs, step details, etc.
-            
             return enhanced_logs
             
         except Exception as e:
             logger.error(f"Failed to fetch GitHub logs: {e}")
             return incident.error_log
 
-    async def _fetch_argocd_logs(self, incident: IncidentEvent) -> str:
+    def _fetch_argocd_logs(self, incident: IncidentEvent) -> str:
         """Fetch ArgoCD application logs with enhanced context"""
         try:
             raw_event = incident.raw_event
@@ -334,7 +332,7 @@ Message: {status.get('health', {}).get('message', 'No health message')}
             logger.error(f"Failed to fetch ArgoCD logs: {e}")
             return incident.error_log
 
-    async def _fetch_kubernetes_logs(self, incident: IncidentEvent) -> str:
+    def _fetch_kubernetes_logs(self, incident: IncidentEvent) -> str:
         """Fetch Kubernetes pod/resource logs with enhanced context"""
         try:
             raw_event = incident.raw_event
@@ -368,36 +366,6 @@ Host: {raw_event.get('source', {}).get('host', 'Unknown')}
             logger.error(f"Failed to fetch Kubernetes logs: {e}")
             return incident.error_log
 
-    async def analyze_failure(self, incident: IncidentEvent) -> Optional[FailureAnalysis]:
-        """
-        Main failure analysis method with enhanced log fetching and LLM integration
-        """
-        try:
-            logger.info(f"Starting enhanced analysis for incident: {incident.incident_id}")
-            
-            # Step 1: Fetch detailed logs from source platforms
-            detailed_logs = await self._fetch_detailed_logs(incident)
-            
-            # Step 2: Perform pattern matching analysis with detailed logs
-            pattern_analysis = self._pattern_match_analysis(incident, detailed_logs)
-            
-            # Step 3: Generate comprehensive LLM analysis  
-            llm_analysis = await self._llm_analysis(incident, detailed_logs, pattern_analysis)
-            
-            # Step 4: Combine analyses with confidence weighting
-            final_analysis = self._combine_analyses(incident, pattern_analysis, llm_analysis)
-            
-            if final_analysis:
-                logger.info(f"Analysis complete for {incident.incident_id}: "
-                           f"{final_analysis.primary_category.value}/{final_analysis.subcategory} "
-                           f"(confidence: {final_analysis.confidence:.2f}, fixability: {final_analysis.fixability.value})")
-            
-            return final_analysis
-            
-        except Exception as e:
-            logger.error(f"Failed to analyze incident {incident.incident_id}: {e}")
-            return self._create_fallback_analysis(incident)
-
     def _pattern_match_analysis(self, incident: IncidentEvent, detailed_logs: str = None) -> Optional[Dict[str, Any]]:
         """Perform comprehensive pattern matching against known error signatures"""
         # Use detailed logs if available, otherwise fall back to incident error log
@@ -418,11 +386,10 @@ Host: {raw_event.get('source', {}).get('host', 'Unknown')}
                 if match_count > 1:
                     confidence += min(0.1, match_count * 0.02)
                 
-                # Boost confidence for GitHub-specific patterns
+                # Boost confidence for source-specific patterns
                 if incident.source == "github_actions" and "workflow" in pattern.subcategory:
                     confidence += 0.05
                 
-                # Boost confidence for Kubernetes-specific patterns  
                 if incident.source == "kubernetes" and "pod" in pattern.subcategory:
                     confidence += 0.05
                 
@@ -456,7 +423,12 @@ Host: {raw_event.get('source', {}).get('host', 'Unknown')}
         logger.debug("No pattern matches found in logs")
         return None
 
-    async def _llm_analysis(self, incident: IncidentEvent, detailed_logs: str = None) -> Optional[Dict[str, Any]]:
+    async def _llm_analysis(
+        self, 
+        incident: IncidentEvent, 
+        detailed_logs: str = None,
+        pattern_analysis: Optional[Dict[str, Any]] = None
+    ) -> Optional[Dict[str, Any]]:
         """Perform enhanced LLM-based analysis using llama-3.1-nemotron-8b with detailed logs"""
         try:
             if not self.api_key:
@@ -466,7 +438,7 @@ Host: {raw_event.get('source', {}).get('host', 'Unknown')}
             # Use detailed logs for more comprehensive analysis
             logs_to_analyze = detailed_logs or incident.error_log
             
-            prompt = self._build_enhanced_analysis_prompt(incident, logs_to_analyze)
+            prompt = self._build_enhanced_analysis_prompt(incident, logs_to_analyze, pattern_analysis)
             response = await self._call_llm(prompt)
             
             if response:
@@ -474,8 +446,14 @@ Host: {raw_event.get('source', {}).get('host', 'Unknown')}
                 if parsed_response:
                     parsed_response["source"] = "llm_analysis"
                     # Boost confidence for LLM analysis with detailed logs
-                    if detailed_logs:
-                        parsed_response["confidence"] = min(0.95, parsed_response.get("confidence", 0.7) + 0.1)
+                    if detailed_logs and len(detailed_logs) > len(incident.error_log):
+                        parsed_response["confidence"] = min(0.95, parsed_response.get("confidence", 0.7) + 0.05)
+                    
+                    # Additional boost if LLM agrees with pattern matching
+                    if pattern_analysis and parsed_response.get("category") == pattern_analysis.get("category"):
+                        parsed_response["confidence"] = min(0.98, parsed_response.get("confidence", 0.7) + 0.1)
+                        logger.info(f"LLM analysis agrees with pattern matching on category: {parsed_response.get('category').value}")
+                    
                     return parsed_response
             
             return None
@@ -484,8 +462,27 @@ Host: {raw_event.get('source', {}).get('host', 'Unknown')}
             logger.error(f"LLM analysis failed: {e}")
             return None
 
-    def _build_enhanced_analysis_prompt(self, incident: IncidentEvent, detailed_logs: str) -> str:
+    def _build_enhanced_analysis_prompt(
+        self, 
+        incident: IncidentEvent, 
+        detailed_logs: str,
+        pattern_analysis: Optional[Dict[str, Any]] = None
+    ) -> str:
         """Build comprehensive analysis prompt with enhanced context for llama-3.1-nemotron-8b"""
+        
+        # Add pattern analysis hint if available
+        pattern_hint = ""
+        if pattern_analysis:
+            pattern_hint = f"""
+Pattern Analysis Suggestion:
+- Detected Category: {pattern_analysis['category'].value}
+- Subcategory: {pattern_analysis['subcategory']}
+- Confidence: {pattern_analysis['confidence']:.2f}
+- Reasoning: {pattern_analysis['reasoning']}
+
+Please consider this pattern match but perform your own independent analysis.
+"""
+        
         prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are an expert DevOps engineer specializing in deployment failure analysis and automated remediation. Your expertise includes:
 
@@ -529,7 +526,8 @@ RESPOND ONLY with valid JSON in this exact format:
         "specific action 2"
     ],
     "affected_files": ["file1.yaml", "file2.json"],
-    "estimated_fix_time": "5 minutes"
+    "estimated_fix_time": "5 minutes",
+    "summary": "Brief one-line summary of the issue"
 }}
 
 Focus on operational/infrastructure failures, not application source code bugs.<|eot_id|>
@@ -544,11 +542,13 @@ INCIDENT DETAILS:
 - Service: {incident.context.get('service', 'unknown')}
 - Severity: {incident.severity}
 
+{pattern_hint}
+
 DETAILED LOGS AND CONTEXT:
-{detailed_logs}
+{detailed_logs[:4000]}
 
 SYSTEM STATE:
-{json.dumps(incident.system_state, indent=2) if incident.system_state else 'No system state available'}
+{json.dumps(incident.system_state, indent=2)[:1000] if incident.system_state else 'No system state available'}
 
 Provide a comprehensive analysis with specific remediation steps.<|eot_id|>"""
         
@@ -607,10 +607,12 @@ Provide a comprehensive analysis with specific remediation steps.<|eot_id|>"""
                 data = response.json()
                 content = data["choices"][0]["message"]["content"]
                 
+                # Extract JSON from code blocks if present
                 json_match = re.search(r'```json\s*(.*?)\s*```', content, re.DOTALL)
                 if json_match:
                     return json_match.group(1)
                 
+                # Try to find JSON object
                 json_match = re.search(r'\{.*\}', content, re.DOTALL)
                 if json_match:
                     return json_match.group(0)
@@ -717,6 +719,8 @@ Provide a comprehensive analysis with specific remediation steps.<|eot_id|>"""
                 "fix_actions": data.get("fix_actions", []),
                 "affected_files": data.get("affected_files", []),
                 "estimated_fix_time": data.get("estimated_fix_time", "unknown"),
+                "summary": data.get("summary", data["root_cause"][:100]),
+                "indicators": data.get("indicators", []),
                 "auto_fix_steps": data.get("auto_fix_steps", []),
                 "retry_strategy": data.get("retry_strategy", {}),
                 "github_actions": data.get("github_actions", {}),
@@ -731,7 +735,7 @@ Provide a comprehensive analysis with specific remediation steps.<|eot_id|>"""
             
         except (json.JSONDecodeError, ValueError, TypeError) as e:
             logger.error(f"Failed to parse LLM response: {e}")
-            logger.debug(f"Raw response: {response}")
+            logger.debug(f"Raw response: {response[:500]}")
             return None
 
     def _combine_analyses(
@@ -743,6 +747,7 @@ Provide a comprehensive analysis with specific remediation steps.<|eot_id|>"""
         """Combine pattern matching and LLM analysis results with intelligent weighting"""
         
         if pattern_match and llm_analysis:
+            # Both analyses available - combine them
             if pattern_match["category"] == llm_analysis["category"]:
                 combined_confidence = min(
                     (pattern_match["confidence"] * 0.4) + (llm_analysis["confidence"] * 0.6) + 0.1,
@@ -762,10 +767,21 @@ Provide a comprehensive analysis with specific remediation steps.<|eot_id|>"""
                 confidence=combined_confidence,
                 reasoning=f"LLM analysis (conf: {llm_analysis['confidence']:.2f}) + Pattern match (conf: {pattern_match['confidence']:.2f}): {llm_analysis['reasoning']}",
                 affected_components=[],
-                recent_changes=[]
+                recent_changes=[],
+                summary=llm_analysis.get("summary", llm_analysis["root_cause"][:100]),
+                fix_actions=llm_analysis.get("fix_actions", []),
+                affected_files=llm_analysis.get("affected_files", []),
+                estimated_fix_time=llm_analysis.get("estimated_fix_time", "Unknown"),
+                indicators=llm_analysis.get("indicators", []),
+                auto_fix_steps=llm_analysis.get("auto_fix_steps", []),
+                retry_strategy=llm_analysis.get("retry_strategy", {}),
+                github_actions=llm_analysis.get("github_actions", {}),
+                kubernetes_fixes=llm_analysis.get("kubernetes_fixes", {}),
+                requires_approval=llm_analysis.get("requires_approval", False)
             )
         
         elif llm_analysis:
+            # Only LLM analysis available
             return FailureAnalysis(
                 incident_id=incident.incident_id,
                 primary_category=llm_analysis["category"],
@@ -775,10 +791,21 @@ Provide a comprehensive analysis with specific remediation steps.<|eot_id|>"""
                 confidence=llm_analysis["confidence"],
                 reasoning=f"LLM analysis: {llm_analysis['reasoning']}",
                 affected_components=[],
-                recent_changes=[]
+                recent_changes=[],
+                summary=llm_analysis.get("summary", llm_analysis["root_cause"][:100]),
+                fix_actions=llm_analysis.get("fix_actions", []),
+                affected_files=llm_analysis.get("affected_files", []),
+                estimated_fix_time=llm_analysis.get("estimated_fix_time", "Unknown"),
+                indicators=llm_analysis.get("indicators", []),
+                auto_fix_steps=llm_analysis.get("auto_fix_steps", []),
+                retry_strategy=llm_analysis.get("retry_strategy", {}),
+                github_actions=llm_analysis.get("github_actions", {}),
+                kubernetes_fixes=llm_analysis.get("kubernetes_fixes", {}),
+                requires_approval=llm_analysis.get("requires_approval", False)
             )
         
         elif pattern_match:
+            # Only pattern match available
             return FailureAnalysis(
                 incident_id=incident.incident_id,
                 primary_category=pattern_match["category"],
@@ -788,10 +815,21 @@ Provide a comprehensive analysis with specific remediation steps.<|eot_id|>"""
                 confidence=pattern_match["confidence"],
                 reasoning=f"Pattern matching: {pattern_match['reasoning']}",
                 affected_components=[],
-                recent_changes=[]
+                recent_changes=[],
+                summary=f"{pattern_match['category'].value} - {pattern_match['subcategory']}",
+                fix_actions=[],
+                affected_files=[],
+                estimated_fix_time="Unknown",
+                indicators=[],
+                auto_fix_steps=[],
+                retry_strategy={},
+                github_actions={},
+                kubernetes_fixes={},
+                requires_approval=False
             )
         
         else:
+            # No analysis available - use fallback
             return self._create_fallback_analysis(incident)
 
     def _create_fallback_analysis(self, incident: IncidentEvent) -> FailureAnalysis:
@@ -833,13 +871,24 @@ Provide a comprehensive analysis with specific remediation steps.<|eot_id|>"""
             confidence=confidence,
             reasoning="Fallback rule-based analysis due to LLM unavailability",
             affected_components=[],
-            recent_changes=[]
+            recent_changes=[],
+            summary=f"{category.value} - {subcategory}",
+            fix_actions=[],
+            affected_files=[],
+            estimated_fix_time="Unknown",
+            indicators=[],
+            auto_fix_steps=[],
+            retry_strategy={},
+            github_actions={},
+            kubernetes_fixes={},
+            requires_approval=True
         )
 
     def _extract_affected_components(self, incident: IncidentEvent) -> List[str]:
         """Extract affected components using enhanced parsing"""
         components = set()
         
+        # Add components from context
         context_components = [
             incident.context.get("component"),
             incident.context.get("service"),
@@ -849,6 +898,7 @@ Provide a comprehensive analysis with specific remediation steps.<|eot_id|>"""
         
         error_text = incident.error_log
         
+        # Kubernetes patterns
         k8s_patterns = [
             r"(?:pod|service|deployment|statefulset|daemonset|configmap|secret)[/\s]+([a-zA-Z0-9-_.]+)",
             r"(?:namespace)[/\s]+([a-zA-Z0-9-]+)",
@@ -856,27 +906,31 @@ Provide a comprehensive analysis with specific remediation steps.<|eot_id|>"""
             r"(?:image)[/\s]+([a-zA-Z0-9-_./:]+)"
         ]
         
+        # GitHub patterns
         github_patterns = [
             r"(?:workflow|job|step)[/\s]+([a-zA-Z0-9-_.]+)",
             r"(?:action)[/\s]+([a-zA-Z0-9-_./@]+)"
         ]
         
+        # ArgoCD patterns
         argocd_patterns = [
             r"(?:application|project)[/\s]+([a-zA-Z0-9-_.]+)"
         ]
         
         all_patterns = k8s_patterns + github_patterns + argocd_patterns
         
+        # Extract components using patterns
         for pattern in all_patterns:
             matches = re.findall(pattern, error_text, re.IGNORECASE)
             components.update(matches)
         
+        # Filter and clean components
         filtered_components = []
         for comp in components:
             if comp and len(comp) > 2 and not comp.isdigit():
                 filtered_components.append(comp)
         
-        return filtered_components[:10]  
+        return filtered_components[:10]  # Limit to 10 components
 
     async def _gather_recent_changes(self, incident: IncidentEvent) -> List[Dict[str, Any]]:
         """Gather recent changes that might be related to the failure"""
@@ -890,6 +944,11 @@ Provide a comprehensive analysis with specific remediation steps.<|eot_id|>"""
                 "component": incident.context.get("component", "unknown"),
                 "severity": incident.severity
             })
+            
+            # Could be extended to fetch:
+            # - Recent commits from GitHub
+            # - Recent deployments from ArgoCD
+            # - Recent config changes from Kubernetes
                         
         except Exception as e:
             logger.error(f"Failed to gather recent changes: {e}")
