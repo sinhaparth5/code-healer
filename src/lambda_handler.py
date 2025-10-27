@@ -103,3 +103,4 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         logger.exception(f"Unexpected error: {e}")
         return create_response(500, "Internal server error")
 
+
