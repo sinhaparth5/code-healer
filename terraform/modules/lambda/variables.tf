@@ -73,7 +73,7 @@ variable "sagemaker_embedding_endpoint" {
 }
 
 variable "sagemaker_embedding_endpoint_arn" {
-  type = arn
+  type = string
 }
 
 variable "slack_token_secret_name" {
