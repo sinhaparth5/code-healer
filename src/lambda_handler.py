@@ -278,7 +278,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         API Gateway response with status and body
     """
     # Setup logging
-    setup_lamdba_logging()
+    setup_lambda_logging()
     
     request_id = getattr(context, 'request_id', 'unknown')
     logger.info(f"Received webhook event", extra={
