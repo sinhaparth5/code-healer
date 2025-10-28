@@ -1,3 +1,10 @@
+locals {
+  # Construct Lambda ARNs if not provided
+  lambda_function_arn = var.lambda_function_arn != "" ? var.lambda_function_arn : "arn:aws:lambda:${var.aws_region}:${var.aws_account_id}:function:${var.project_name}-codehealer*"
+  
+  authorizer_lambda_arn = var.authorizer_lambda_arn != "" ? var.authorizer_lambda_arn : "arn:aws:lambda:${var.aws_region}:${var.aws_account_id}:function:${var.project_name}-authorizer*"
+}
+
 resource "aws_iam_role" "api_gateway_cloudwatch" {
   name = "${var.project_name}-apigateway-cloudwatch"
 
@@ -48,7 +55,7 @@ resource "aws_iam_role_policy" "lambda_authorizer" {
       Action = [
         "lambda:InvokeFunction"
       ]
-      Resource = var.authorizer_lambda_arn
+      Resource = local.authorizer_lambda_arn
     }]
   })
 }
@@ -98,8 +105,8 @@ resource "aws_iam_role_policy" "github_actions" {
           "lambda:GetFunctionConfiguration"
         ]
         Resource = [
-          var.lambda_function_arn,
-          var.authorizer_lambda_arn
+          local.lambda_function_arn,
+          local.authorizer_lambda_arn
         ]
       },
       {

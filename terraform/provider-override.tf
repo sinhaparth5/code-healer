@@ -1,22 +1,3 @@
-# Override for local development with LocalStack
-# Rename to provider-override.tf to activate
-
-terraform {
-  required_version = ">= 1.5.0"
-
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-  
-  # Use local backend instead of S3
-  backend "local" {
-    path = "terraform-local.tfstate"
-  }
-}
-
 provider "aws" {
   region                      = "us-east-1"
   access_key                  = "test"

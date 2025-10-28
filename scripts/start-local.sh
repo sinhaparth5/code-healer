@@ -86,15 +86,6 @@ echo -e "${GREEN}✅ Mock SageMaker is ready${NC}"
 echo -e "${GREEN}🔧 Initializing Terraform...${NC}"
 cd terraform
 
-# Create local backend override
-cat > backend-override.tf << 'EOF'
-terraform {
-  backend "local" {
-    path = "terraform-local.tfstate"
-  }
-}
-EOF
-
 # Create provider override if it doesn't exist
 if [ ! -f provider-override.tf ]; then
     if [ -f provider-override.tf.example ]; then

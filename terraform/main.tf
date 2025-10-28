@@ -11,17 +11,9 @@ terraform {
       version = "~> 2.4"
     }
   }
-}
 
-provider "aws" {
-  region = var.aws_region
-
-  default_tags {
-    tags = {
-      Project     = var.project_name
-      Environment = var.environment
-      ManagedBy   = "Terraform"
-    }
+  backend "local" {
+    path = "terraform-local.tfstate"
   }
 }
 
@@ -35,14 +27,18 @@ locals {
   )
 }
 
+# Create IAM roles FIRST without Lambda ARNs
 module "iam" {
   source = "./modules/iam"
 
   project_name                   = var.project_name
   aws_region                     = var.aws_region
   aws_account_id                 = data.aws_caller_identity.current.account_id
-  authorizer_lambda_arn          = module.lambda.authorizer_function_arn
-  lambda_function_arn            = module.lambda.function_arn
+  
+  # ✅ DON'T pass lambda ARNs - use wildcards in IAM module instead
+  # authorizer_lambda_arn          = module.lambda.authorizer_function_arn  # ❌ REMOVED
+  # lambda_function_arn            = module.lambda.function_arn             # ❌ REMOVED
+  
   opensearch_domain_arn          = module.opensearch.domain_arn
   incidents_table_arn            = module.dynamodb.incidents_table_arn
   resolutions_table_arn          = module.dynamodb.resolutions_table_arn

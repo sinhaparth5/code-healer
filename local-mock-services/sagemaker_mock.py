@@ -8,7 +8,6 @@ import numpy as np
 import time
 import logging
 from threading import Thread
-from sentence_transformers import SentenceTransformer
 import json
 
 # Configure logging
@@ -18,17 +17,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Initialize embedding model (lightweight for local testing)
+# Try to import sentence_transformers, but don't fail if it's not available
 embedding_model = None
+USE_REAL_EMBEDDINGS = False
 
 def load_embedding_model():
-    global embedding_model
+    global embedding_model, USE_REAL_EMBEDDINGS
     try:
-        logger.info("Loading embedding model...")
+        logger.info("Attempting to load embedding model...")
+        from sentence_transformers import SentenceTransformer
         embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+        USE_REAL_EMBEDDINGS = True
         logger.info("Embedding model loaded successfully")
     except Exception as e:
-        logger.error(f"Failed to load embedding model: {e}")
+        logger.warning(f"Could not load sentence_transformers: {e}")
+        logger.info("Will use mock embeddings instead")
+        USE_REAL_EMBEDDINGS = False
 
 # LLM App
 llm_app = Flask('llm-endpoint')
@@ -119,22 +123,29 @@ def embedding_invocations():
         logger.info(f"Embedding request - {len(texts)} texts")
         
         # Generate embeddings
-        if embedding_model:
+        if USE_REAL_EMBEDDINGS and embedding_model:
             embeddings = embedding_model.encode(texts).tolist()
         else:
-            # Fallback to random embeddings if model not loaded
-            embeddings = [np.random.rand(384).tolist() for _ in texts]
+            # Use deterministic mock embeddings based on text hash
+            # This ensures consistent embeddings for the same text
+            embeddings = []
+            for text in texts:
+                # Create a deterministic "embedding" based on text hash
+                np.random.seed(hash(text) % (2**32))
+                embedding = np.random.rand(384).tolist()
+                embeddings.append(embedding)
         
         latency = time.time() - start_time
         
         response = {
             "embeddings": embeddings,
-            "model": "mock-all-MiniLM-L6-v2",
+            "model": "mock-all-MiniLM-L6-v2" if not USE_REAL_EMBEDDINGS else "all-MiniLM-L6-v2",
             "dimension": len(embeddings[0]) if embeddings else 0,
-            "latency_ms": round(latency * 1000, 2)
+            "latency_ms": round(latency * 1000, 2),
+            "using_real_model": USE_REAL_EMBEDDINGS
         }
         
-        logger.info(f"Embedding completed in {latency:.2f}s")
+        logger.info(f"Embedding completed in {latency:.2f}s (real_model={USE_REAL_EMBEDDINGS})")
         return jsonify(response), 200
         
     except Exception as e:
