@@ -26,3 +26,4 @@ jsonschema
 tenacity
 kubernetes
 pyyaml
+aiohttp

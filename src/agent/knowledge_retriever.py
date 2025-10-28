@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import hashlib
 
 from utils.logger import get_logger
+from utils.config import config
 from agent.core_agent import (
     IncidentEvent, FailureAnalysis, ResolutionCandidate, 
     ResolutionSource
@@ -47,15 +48,26 @@ class KnowledgeRetriever:
     3. LLM Analysis (novel failures, 60-80% confidence baseline)
     """
     
-    def __init__(self, config: Dict[str, Any], slack_client=None):
-        self.config = config
+    def __init__(self, config_dict: Dict[str, Any] = None, slack_client=None):
+        if config_dict is None:
+            self.config = {
+                "slack": {},
+                "vector_db": {},
+                "embedding": config.get_embedding_config()
+            }
+        else:
+            self.config = config_dict
+            # Ensure embedding config is available
+            if "embedding" not in self.config:
+                self.config["embedding"] = config.get_embedding_config()
+        
         self.slack_client = slack_client
         self.vector_client = None
         self.embedding_client = None
         
-        self.slack_config = config.get("slack", {})
-        self.vector_config = config.get("vector_db", {})
-        self.embedding_config = config.get("embedding", {})
+        self.slack_config = self.config.get("slack", {})
+        self.vector_config = self.config.get("vector_db", {})
+        self.embedding_config = self.config.get("embedding", {})
         
         self.max_slack_results = self.slack_config.get("max_results", 20)
         self.max_vector_results = self.vector_config.get("max_results", 10)
@@ -68,7 +80,7 @@ class KnowledgeRetriever:
             ResolutionSource.LLM_ANALYSIS: 0.65
         }
         
-        logger.info("KnowledgeRetriever initialized")
+        logger.info("KnowledgeRetriever initialized with NVIDIA NIM embedding support")
 
     async def retrieve_solutions(
         self, 
@@ -320,12 +332,67 @@ class KnowledgeRetriever:
 
     async def _call_embedding_service(self, text: str) -> Optional[List[float]]:
         """Call NVIDIA Embedding NIM service"""
-        # Placeholder implementation - will integrate with actual service
-        await asyncio.sleep(0.1)  # Simulate API call
-        
-        # Return mock embedding for development
-        import random
-        return [random.random() for _ in range(768)]  # Typical embedding dimension
+        try:
+            import aiohttp
+            
+            nim_config = self.embedding_config.get("nvidia_nim", {})
+            nim_url = nim_config.get("url", "https://integrate.api.nvidia.com/v1/embeddings")
+            api_key = nim_config.get("api_key")
+            model = nim_config.get("model", "nvidia/nv-embedqa-e5-v5")
+            
+            if not api_key:
+                logger.warning("NVIDIA NIM API key not configured, falling back to mock embeddings")
+                import random
+                return [random.random() for _ in range(768)]
+            
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+            
+            payload = {
+                "input": [text],
+                "model": model,
+                "encoding_format": "float",
+                "extra_body": {
+                    "truncate": "END"
+                }
+            }
+            
+            timeout = aiohttp.ClientTimeout(total=30) 
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(nim_url, headers=headers, json=payload) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        
+                        if "data" in result and len(result["data"]) > 0:
+                            embedding = result["data"][0].get("embedding", [])
+                            if embedding:
+                                logger.info(f"Generated embedding with dimension: {len(embedding)}")
+                                return embedding
+                            else:
+                                logger.error("No embedding found in NIM response")
+                        else:
+                            logger.error("Invalid response format from NVIDIA NIM")
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"NVIDIA NIM API error {response.status}: {error_text}")
+            
+            logger.warning("Falling back to mock embeddings due to API failure")
+            import random
+            return [random.random() for _ in range(768)]
+            
+        except ImportError:
+            logger.warning("aiohttp not available, falling back to mock embeddings")
+            await asyncio.sleep(0.1)  
+            import random
+            return [random.random() for _ in range(768)]
+            
+        except Exception as e:
+            logger.error(f"Failed to call NVIDIA NIM embedding service: {e}")
+            import random
+            return [random.random() for _ in range(768)]
 
     async def _vector_knn_search(
         self, 

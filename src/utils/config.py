@@ -36,6 +36,11 @@ class Config(BaseSettings):
     nvidia_nim_endpoint: str = os.getenv('NVIDIA_NIM_ENDPOINT', 'https://api.nvcf.nvidia.com/v2/nvcf/pexec/functions')
     nvidia_nim_model: str = os.getenv('NVIDIA_NIM_MODEL', 'llama-3.1-nemotron-8b')
     
+    # NVIDIA NIM Embedding Configuration
+    nvidia_nim_embedding_api_key: str = os.getenv('NVIDIA_NIM_EMBEDDING_API_KEY', '')
+    nvidia_nim_embedding_endpoint: str = os.getenv('NVIDIA_NIM_EMBEDDING_ENDPOINT', 'https://integrate.api.nvidia.com/v1/embeddings')
+    nvidia_nim_embedding_model: str = os.getenv('NVIDIA_NIM_EMBEDDING_MODEL', 'nvidia/nv-embedqa-e5-v5')
+    
     # LLM Provider Selection ('openai', 'nvidia_nim', 'sagemaker')
     llm_provider: str = os.getenv('LLM_PROVIDER', 'openai')
     llm_fallback_enabled: bool = os.getenv('LLM_FALLBACK_ENABLED', 'true').lower() == 'true'
@@ -68,6 +73,16 @@ class Config(BaseSettings):
     # Logging
     log_level: str = os.getenv('LOG_LEVEL', 'INFO')
     
+    def get_embedding_config(self) -> dict:
+        """Get embedding configuration for NVIDIA NIM"""
+        return {
+            "nvidia_nim": {
+                "url": self.nvidia_nim_embedding_endpoint,
+                "api_key": self.nvidia_nim_embedding_api_key or self.nvidia_nim_api_key,  
+                "model": self.nvidia_nim_embedding_model
+            }
+        }
+
     def get_llm_config(self) -> dict:
         """Get LLM configuration for the selected provider"""
         if self.llm_provider == "openai":
