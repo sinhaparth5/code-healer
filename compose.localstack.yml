@@ -68,19 +68,6 @@ services:
       timeout: 5s
       retries: 3
 
-  # Optional: LocalStack Web UI
-  localstack-ui:
-    image: localstack/localstack-ui:latest
-    container_name: codehealer-localstack-ui
-    ports:
-      - "8055:8080"
-    environment:
-      - LOCALSTACK_URL=http://localstack:4566
-    networks:
-      - codehealer-local
-    depends_on:
-      - localstack
-
 networks:
   codehealer-local:
     driver: bridge
