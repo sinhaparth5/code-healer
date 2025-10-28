@@ -1,0 +1,18 @@
+name: Local Integration Tests
+
+on: [pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Start LocalStack
+        run: ./scripts/start-local.sh
+      
+      - name: Run Tests
+        run: ./scripts/test-local.sh
+      
+      - name: Stop LocalStack
+        run: ./scripts/stop-local.sh
