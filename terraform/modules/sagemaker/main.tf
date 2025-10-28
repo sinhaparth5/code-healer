@@ -1,6 +1,44 @@
+# Local mode detection
+locals {
+  is_local = var.environment == "local"
+  
+  # Use mock endpoints for local
+  llm_endpoint_url = local.is_local ? "http://host.docker.internal:8080" : null
+  embedding_endpoint_url = local.is_local ? "http://host.docker.internal:8081" : null
+}
+
+# Mock resources for local mode
+resource "null_resource" "llm_mock" {
+  count = local.is_local ? 1 : 0
+  
+  triggers = {
+    endpoint = "http://mock-sagemaker:8080"
+    timestamp = timestamp()
+  }
+  
+  provisioner "local-exec" {
+    command = "echo 'Using mock LLM endpoint at http://localhost:8080'"
+  }
+}
+
+resource "null_resource" "embedding_mock" {
+  count = local.is_local ? 1 : 0
+  
+  triggers = {
+    endpoint = "http://mock-sagemaker:8081"
+    timestamp = timestamp()
+  }
+  
+  provisioner "local-exec" {
+    command = "echo 'Using mock embedding endpoint at http://localhost:8081'"
+  }
+}
+
+# SageMaker Model for LLM (AWS only)
 resource "aws_sagemaker_model" "llm" {
+  count              = local.is_local ? 0 : 1
   name               = "${var.project_name}-llm-model"
-  execution_role_arn = aws_iam_role.sagemaker_execution.arn
+  execution_role_arn = aws_iam_role.sagemaker_execution[0].arn
 
   primary_container {
     image          = var.llm_container_image
@@ -11,9 +49,11 @@ resource "aws_sagemaker_model" "llm" {
   tags = var.tags
 }
 
+# SageMaker Model for Embedding (AWS only)
 resource "aws_sagemaker_model" "embedding" {
+  count              = local.is_local ? 0 : 1
   name               = "${var.project_name}-embedding-model"
-  execution_role_arn = aws_iam_role.sagemaker_execution.arn
+  execution_role_arn = aws_iam_role.sagemaker_execution[0].arn
 
   primary_container {
     image          = var.embedding_container_image
@@ -24,90 +64,115 @@ resource "aws_sagemaker_model" "embedding" {
   tags = var.tags
 }
 
+# SageMaker Endpoint Configuration for LLM (AWS only)
 resource "aws_sagemaker_endpoint_configuration" "llm" {
-  name = "${var.project_name}-llm-config"
+  count = local.is_local ? 0 : 1
+  name  = "${var.project_name}-llm-config"
 
   production_variants {
     variant_name           = "AllTraffic"
-    model_name            = aws_sagemaker_model.llm.name
+    model_name             = aws_sagemaker_model.llm[0].name
     initial_instance_count = var.llm_instance_count
-    instance_type         = var.llm_instance_type
+    instance_type          = var.llm_instance_type
     initial_variant_weight = 1
 
-    serverless_config {
-      max_concurrency   = var.llm_serverless_max_concurrency
-      memory_size_in_mb = var.llm_serverless_memory_size
+    dynamic "serverless_config" {
+      for_each = var.llm_serverless_max_concurrency > 0 ? [1] : []
+      content {
+        max_concurrency   = var.llm_serverless_max_concurrency
+        memory_size_in_mb = var.llm_serverless_memory_size
+      }
     }
   }
 
-  data_capture_config {
-    enable_capture              = var.enable_data_capture
-    initial_sampling_percentage = var.data_capture_sampling_percentage
-    destination_s3_uri          = "${var.data_capture_s3_uri}/llm"
+  dynamic "data_capture_config" {
+    for_each = var.enable_data_capture ? [1] : []
+    content {
+      enable_capture              = true
+      initial_sampling_percentage = var.data_capture_sampling_percentage
+      destination_s3_uri          = "${var.data_capture_s3_uri}/llm"
 
-    capture_options {
-      capture_mode = "InputAndOutput"
+      capture_options {
+        capture_mode = "InputAndOutput"
+      }
     }
   }
 
-  async_inference_config {
-    output_config {
-      s3_output_path = "${var.async_output_s3_uri}/llm"
-    }
+  dynamic "async_inference_config" {
+    for_each = var.async_output_s3_uri != "" ? [1] : []
+    content {
+      output_config {
+        s3_output_path = "${var.async_output_s3_uri}/llm"
+      }
 
-    client_config {
-      max_concurrent_invocations_per_instance = var.max_concurrent_invocations
+      client_config {
+        max_concurrent_invocations_per_instance = var.max_concurrent_invocations
+      }
     }
   }
 
   tags = var.tags
 }
 
+# SageMaker Endpoint Configuration for Embedding (AWS only)
 resource "aws_sagemaker_endpoint_configuration" "embedding" {
-  name = "${var.project_name}-embedding-config"
+  count = local.is_local ? 0 : 1
+  name  = "${var.project_name}-embedding-config"
 
   production_variants {
     variant_name           = "AllTraffic"
-    model_name            = aws_sagemaker_model.embedding.name
+    model_name             = aws_sagemaker_model.embedding[0].name
     initial_instance_count = var.embedding_instance_count
-    instance_type         = var.embedding_instance_type
+    instance_type          = var.embedding_instance_type
     initial_variant_weight = 1
 
-    serverless_config {
-      max_concurrency   = var.embedding_serverless_max_concurrency
-      memory_size_in_mb = var.embedding_serverless_memory_size
+    dynamic "serverless_config" {
+      for_each = var.embedding_serverless_max_concurrency > 0 ? [1] : []
+      content {
+        max_concurrency   = var.embedding_serverless_max_concurrency
+        memory_size_in_mb = var.embedding_serverless_memory_size
+      }
     }
   }
 
-  data_capture_config {
-    enable_capture              = var.enable_data_capture
-    initial_sampling_percentage = var.data_capture_sampling_percentage
-    destination_s3_uri          = "${var.data_capture_s3_uri}/embedding"
+  dynamic "data_capture_config" {
+    for_each = var.enable_data_capture ? [1] : []
+    content {
+      enable_capture              = true
+      initial_sampling_percentage = var.data_capture_sampling_percentage
+      destination_s3_uri          = "${var.data_capture_s3_uri}/embedding"
 
-    capture_options {
-      capture_mode = "InputAndOutput"
+      capture_options {
+        capture_mode = "InputAndOutput"
+      }
     }
   }
 
   tags = var.tags
 }
 
+# SageMaker Endpoint for LLM (AWS only)
 resource "aws_sagemaker_endpoint" "llm" {
+  count                = local.is_local ? 0 : 1
   name                 = "${var.project_name}-llm-endpoint"
-  endpoint_config_name = aws_sagemaker_endpoint_configuration.llm.name
+  endpoint_config_name = aws_sagemaker_endpoint_configuration.llm[0].name
 
   tags = var.tags
 }
 
+# SageMaker Endpoint for Embedding (AWS only)
 resource "aws_sagemaker_endpoint" "embedding" {
+  count                = local.is_local ? 0 : 1
   name                 = "${var.project_name}-embedding-endpoint"
-  endpoint_config_name = aws_sagemaker_endpoint_configuration.embedding.name
+  endpoint_config_name = aws_sagemaker_endpoint_configuration.embedding[0].name
 
   tags = var.tags
 }
 
+# IAM Role for SageMaker Execution (AWS only)
 resource "aws_iam_role" "sagemaker_execution" {
-  name = "${var.project_name}-sagemaker-execution"
+  count = local.is_local ? 0 : 1
+  name  = "${var.project_name}-sagemaker-execution"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -123,9 +188,11 @@ resource "aws_iam_role" "sagemaker_execution" {
   tags = var.tags
 }
 
+# IAM Policy for SageMaker (AWS only)
 resource "aws_iam_role_policy" "sagemaker_permissions" {
-  name = "${var.project_name}-sagemaker-permissions"
-  role = aws_iam_role.sagemaker_execution.id
+  count = local.is_local ? 0 : 1
+  name  = "${var.project_name}-sagemaker-permissions"
+  role  = aws_iam_role.sagemaker_execution[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -168,21 +235,26 @@ resource "aws_iam_role_policy" "sagemaker_permissions" {
   })
 }
 
+# CloudWatch Log Groups (AWS only)
 resource "aws_cloudwatch_log_group" "llm_endpoint" {
-  name              = "/aws/sagemaker/Endpoints/${aws_sagemaker_endpoint.llm.name}"
+  count             = local.is_local ? 0 : 1
+  name              = "/aws/sagemaker/Endpoints/${aws_sagemaker_endpoint.llm[0].name}"
   retention_in_days = var.log_retention_days
 
   tags = var.tags
 }
 
 resource "aws_cloudwatch_log_group" "embedding_endpoint" {
-  name              = "/aws/sagemaker/Endpoints/${aws_sagemaker_endpoint.embedding.name}"
+  count             = local.is_local ? 0 : 1
+  name              = "/aws/sagemaker/Endpoints/${aws_sagemaker_endpoint.embedding[0].name}"
   retention_in_days = var.log_retention_days
 
   tags = var.tags
 }
 
+# CloudWatch Alarms (AWS only)
 resource "aws_cloudwatch_metric_alarm" "llm_invocation_errors" {
+  count               = local.is_local ? 0 : 1
   alarm_name          = "${var.project_name}-llm-invocation-errors"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 2
@@ -195,7 +267,7 @@ resource "aws_cloudwatch_metric_alarm" "llm_invocation_errors" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    EndpointName = aws_sagemaker_endpoint.llm.name
+    EndpointName = aws_sagemaker_endpoint.llm[0].name
     VariantName  = "AllTraffic"
   }
 
@@ -203,6 +275,7 @@ resource "aws_cloudwatch_metric_alarm" "llm_invocation_errors" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "llm_latency" {
+  count               = local.is_local ? 0 : 1
   alarm_name          = "${var.project_name}-llm-latency"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 2
@@ -215,7 +288,7 @@ resource "aws_cloudwatch_metric_alarm" "llm_latency" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    EndpointName = aws_sagemaker_endpoint.llm.name
+    EndpointName = aws_sagemaker_endpoint.llm[0].name
     VariantName  = "AllTraffic"
   }
 
@@ -223,6 +296,7 @@ resource "aws_cloudwatch_metric_alarm" "llm_latency" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "embedding_invocation_errors" {
+  count               = local.is_local ? 0 : 1
   alarm_name          = "${var.project_name}-embedding-invocation-errors"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 2
@@ -235,7 +309,7 @@ resource "aws_cloudwatch_metric_alarm" "embedding_invocation_errors" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    EndpointName = aws_sagemaker_endpoint.embedding.name
+    EndpointName = aws_sagemaker_endpoint.embedding[0].name
     VariantName  = "AllTraffic"
   }
 
@@ -243,6 +317,7 @@ resource "aws_cloudwatch_metric_alarm" "embedding_invocation_errors" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "embedding_latency" {
+  count               = local.is_local ? 0 : 1
   alarm_name          = "${var.project_name}-embedding-latency"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 2
@@ -255,24 +330,25 @@ resource "aws_cloudwatch_metric_alarm" "embedding_latency" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    EndpointName = aws_sagemaker_endpoint.embedding.name
+    EndpointName = aws_sagemaker_endpoint.embedding[0].name
     VariantName  = "AllTraffic"
   }
 
   alarm_actions = var.alarm_actions
 }
 
+# Autoscaling for LLM Endpoint (AWS only)
 resource "aws_appautoscaling_target" "llm" {
-  count              = var.enable_autoscaling ? 1 : 0
+  count              = var.enable_autoscaling && !local.is_local ? 1 : 0
   max_capacity       = var.llm_max_capacity
   min_capacity       = var.llm_min_capacity
-  resource_id        = "endpoint/${aws_sagemaker_endpoint.llm.name}/variant/AllTraffic"
+  resource_id        = "endpoint/${aws_sagemaker_endpoint.llm[0].name}/variant/AllTraffic"
   scalable_dimension = "sagemaker:variant:DesiredInstanceCount"
   service_namespace  = "sagemaker"
 }
 
 resource "aws_appautoscaling_policy" "llm" {
-  count              = var.enable_autoscaling ? 1 : 0
+  count              = var.enable_autoscaling && !local.is_local ? 1 : 0
   name               = "${var.project_name}-llm-scaling"
   policy_type        = "TargetTrackingScaling"
   resource_id        = aws_appautoscaling_target.llm[0].resource_id
@@ -291,17 +367,18 @@ resource "aws_appautoscaling_policy" "llm" {
   }
 }
 
+# Autoscaling for Embedding Endpoint (AWS only)
 resource "aws_appautoscaling_target" "embedding" {
-  count              = var.enable_autoscaling ? 1 : 0
+  count              = var.enable_autoscaling && !local.is_local ? 1 : 0
   max_capacity       = var.embedding_max_capacity
   min_capacity       = var.embedding_min_capacity
-  resource_id        = "endpoint/${aws_sagemaker_endpoint.embedding.name}/variant/AllTraffic"
+  resource_id        = "endpoint/${aws_sagemaker_endpoint.embedding[0].name}/variant/AllTraffic"
   scalable_dimension = "sagemaker:variant:DesiredInstanceCount"
   service_namespace  = "sagemaker"
 }
 
 resource "aws_appautoscaling_policy" "embedding" {
-  count              = var.enable_autoscaling ? 1 : 0
+  count              = var.enable_autoscaling && !local.is_local ? 1 : 0
   name               = "${var.project_name}-embedding-scaling"
   policy_type        = "TargetTrackingScaling"
   resource_id        = aws_appautoscaling_target.embedding[0].resource_id

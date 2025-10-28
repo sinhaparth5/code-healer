@@ -1,4 +1,27 @@
+# Local mode detection
+locals {
+  is_local = var.environment == "local"
+  # Use Elasticsearch for local
+  opensearch_endpoint = local.is_local ? "elasticsearch:9200" : null
+}
+
+# Mock resources for local mode
+resource "null_resource" "elasticsearch_mock" {
+  count = local.is_local ? 1 : 0
+  
+  triggers = {
+    endpoint  = "http://elasticsearch:9200"
+    timestamp = timestamp()
+  }
+  
+  provisioner "local-exec" {
+    command = "echo 'Using Elasticsearch at http://localhost:9200 instead of OpenSearch'"
+  }
+}
+
+# OpenSearch Domain (AWS only)
 resource "aws_opensearch_domain" "codehealer" {
+  count          = local.is_local ? 0 : 1
   domain_name    = "${var.project_name}-vector-db"
   engine_version = var.engine_version
 
@@ -60,29 +83,29 @@ resource "aws_opensearch_domain" "codehealer" {
 
   vpc_options {
     subnet_ids         = var.subnet_ids
-    security_group_ids = [aws_security_group.opensearch.id]
+    security_group_ids = [aws_security_group.opensearch[0].id]
   }
 
   log_publishing_options {
-    cloudwatch_log_group_arn = aws_cloudwatch_log_group.index_slow_logs.arn
+    cloudwatch_log_group_arn = aws_cloudwatch_log_group.index_slow_logs[0].arn
     log_type                 = "INDEX_SLOW_LOGS"
     enabled                  = var.enable_slow_logs
   }
 
   log_publishing_options {
-    cloudwatch_log_group_arn = aws_cloudwatch_log_group.search_slow_logs.arn
+    cloudwatch_log_group_arn = aws_cloudwatch_log_group.search_slow_logs[0].arn
     log_type                 = "SEARCH_SLOW_LOGS"
     enabled                  = var.enable_slow_logs
   }
 
   log_publishing_options {
-    cloudwatch_log_group_arn = aws_cloudwatch_log_group.es_application_logs.arn
+    cloudwatch_log_group_arn = aws_cloudwatch_log_group.es_application_logs[0].arn
     log_type                 = "ES_APPLICATION_LOGS"
     enabled                  = var.enable_application_logs
   }
 
   log_publishing_options {
-    cloudwatch_log_group_arn = aws_cloudwatch_log_group.audit_logs.arn
+    cloudwatch_log_group_arn = aws_cloudwatch_log_group.audit_logs[0].arn
     log_type                 = "AUDIT_LOGS"
     enabled                  = var.enable_audit_logs
   }
@@ -96,7 +119,7 @@ resource "aws_opensearch_domain" "codehealer" {
   }
 
   auto_tune_options {
-    desired_state = var.auto_tune_enabled ? "ENABLED" : "DISABLED"
+    desired_state       = var.auto_tune_enabled ? "ENABLED" : "DISABLED"
     rollback_on_disable = "NO_ROLLBACK"
 
     maintenance_schedule {
@@ -120,7 +143,9 @@ resource "aws_opensearch_domain" "codehealer" {
   ]
 }
 
+# Security Group for OpenSearch (AWS only)
 resource "aws_security_group" "opensearch" {
+  count       = local.is_local ? 0 : 1
   name        = "${var.project_name}-opensearch-sg"
   description = "Security group for OpenSearch domain"
   vpc_id      = var.vpc_id
@@ -147,8 +172,10 @@ resource "aws_security_group" "opensearch" {
   )
 }
 
+# OpenSearch Domain Policy (AWS only)
 resource "aws_opensearch_domain_policy" "main" {
-  domain_name = aws_opensearch_domain.codehealer.domain_name
+  count       = local.is_local ? 0 : 1
+  domain_name = aws_opensearch_domain.codehealer[0].domain_name
 
   access_policies = jsonencode({
     Version = "2012-10-17"
@@ -159,13 +186,15 @@ resource "aws_opensearch_domain_policy" "main" {
           AWS = var.access_policy_principals
         }
         Action   = "es:*"
-        Resource = "${aws_opensearch_domain.codehealer.arn}/*"
+        Resource = "${aws_opensearch_domain.codehealer[0].arn}/*"
       }
     ]
   })
 }
 
+# CloudWatch Log Groups (AWS only)
 resource "aws_cloudwatch_log_group" "index_slow_logs" {
+  count             = local.is_local ? 0 : 1
   name              = "/aws/opensearch/${var.project_name}/index-slow-logs"
   retention_in_days = var.log_retention_days
 
@@ -173,6 +202,7 @@ resource "aws_cloudwatch_log_group" "index_slow_logs" {
 }
 
 resource "aws_cloudwatch_log_group" "search_slow_logs" {
+  count             = local.is_local ? 0 : 1
   name              = "/aws/opensearch/${var.project_name}/search-slow-logs"
   retention_in_days = var.log_retention_days
 
@@ -180,6 +210,7 @@ resource "aws_cloudwatch_log_group" "search_slow_logs" {
 }
 
 resource "aws_cloudwatch_log_group" "es_application_logs" {
+  count             = local.is_local ? 0 : 1
   name              = "/aws/opensearch/${var.project_name}/application-logs"
   retention_in_days = var.log_retention_days
 
@@ -187,13 +218,16 @@ resource "aws_cloudwatch_log_group" "es_application_logs" {
 }
 
 resource "aws_cloudwatch_log_group" "audit_logs" {
+  count             = local.is_local ? 0 : 1
   name              = "/aws/opensearch/${var.project_name}/audit-logs"
   retention_in_days = var.log_retention_days
 
   tags = var.tags
 }
 
+# CloudWatch Log Resource Policy (AWS only)
 resource "aws_cloudwatch_log_resource_policy" "opensearch" {
+  count       = local.is_local ? 0 : 1
   policy_name = "${var.project_name}-opensearch-log-policy"
 
   policy_document = jsonencode({
@@ -214,7 +248,9 @@ resource "aws_cloudwatch_log_resource_policy" "opensearch" {
   })
 }
 
+# CloudWatch Alarms (AWS only)
 resource "aws_cloudwatch_metric_alarm" "cluster_status_red" {
+  count               = local.is_local ? 0 : 1
   alarm_name          = "${var.project_name}-opensearch-cluster-red"
   comparison_operator = "GreaterThanOrEqualToThreshold"
   evaluation_periods  = 1
@@ -227,7 +263,7 @@ resource "aws_cloudwatch_metric_alarm" "cluster_status_red" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    DomainName = aws_opensearch_domain.codehealer.domain_name
+    DomainName = aws_opensearch_domain.codehealer[0].domain_name
     ClientId   = var.aws_account_id
   }
 
@@ -235,6 +271,7 @@ resource "aws_cloudwatch_metric_alarm" "cluster_status_red" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "cluster_status_yellow" {
+  count               = local.is_local ? 0 : 1
   alarm_name          = "${var.project_name}-opensearch-cluster-yellow"
   comparison_operator = "GreaterThanOrEqualToThreshold"
   evaluation_periods  = 5
@@ -247,7 +284,7 @@ resource "aws_cloudwatch_metric_alarm" "cluster_status_yellow" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    DomainName = aws_opensearch_domain.codehealer.domain_name
+    DomainName = aws_opensearch_domain.codehealer[0].domain_name
     ClientId   = var.aws_account_id
   }
 
@@ -255,6 +292,7 @@ resource "aws_cloudwatch_metric_alarm" "cluster_status_yellow" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "free_storage_space" {
+  count               = local.is_local ? 0 : 1
   alarm_name          = "${var.project_name}-opensearch-low-storage"
   comparison_operator = "LessThanThreshold"
   evaluation_periods  = 1
@@ -267,7 +305,7 @@ resource "aws_cloudwatch_metric_alarm" "free_storage_space" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    DomainName = aws_opensearch_domain.codehealer.domain_name
+    DomainName = aws_opensearch_domain.codehealer[0].domain_name
     ClientId   = var.aws_account_id
   }
 
@@ -275,6 +313,7 @@ resource "aws_cloudwatch_metric_alarm" "free_storage_space" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "cpu_utilization" {
+  count               = local.is_local ? 0 : 1
   alarm_name          = "${var.project_name}-opensearch-high-cpu"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 3
@@ -287,7 +326,7 @@ resource "aws_cloudwatch_metric_alarm" "cpu_utilization" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    DomainName = aws_opensearch_domain.codehealer.domain_name
+    DomainName = aws_opensearch_domain.codehealer[0].domain_name
     ClientId   = var.aws_account_id
   }
 
@@ -295,6 +334,7 @@ resource "aws_cloudwatch_metric_alarm" "cpu_utilization" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "jvm_memory_pressure" {
+  count               = local.is_local ? 0 : 1
   alarm_name          = "${var.project_name}-opensearch-jvm-memory"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 3
@@ -307,7 +347,7 @@ resource "aws_cloudwatch_metric_alarm" "jvm_memory_pressure" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    DomainName = aws_opensearch_domain.codehealer.domain_name
+    DomainName = aws_opensearch_domain.codehealer[0].domain_name
     ClientId   = var.aws_account_id
   }
 
@@ -315,7 +355,7 @@ resource "aws_cloudwatch_metric_alarm" "jvm_memory_pressure" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "master_cpu_utilization" {
-  count               = var.dedicated_master_enabled ? 1 : 0
+  count               = var.dedicated_master_enabled && !local.is_local ? 1 : 0
   alarm_name          = "${var.project_name}-opensearch-master-cpu"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 3
@@ -328,7 +368,7 @@ resource "aws_cloudwatch_metric_alarm" "master_cpu_utilization" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    DomainName = aws_opensearch_domain.codehealer.domain_name
+    DomainName = aws_opensearch_domain.codehealer[0].domain_name
     ClientId   = var.aws_account_id
   }
 
@@ -336,6 +376,7 @@ resource "aws_cloudwatch_metric_alarm" "master_cpu_utilization" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "knn_circuit_breaker" {
+  count               = local.is_local ? 0 : 1
   alarm_name          = "${var.project_name}-opensearch-knn-breaker"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
@@ -348,7 +389,7 @@ resource "aws_cloudwatch_metric_alarm" "knn_circuit_breaker" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    DomainName = aws_opensearch_domain.codehealer.domain_name
+    DomainName = aws_opensearch_domain.codehealer[0].domain_name
     ClientId   = var.aws_account_id
   }
 

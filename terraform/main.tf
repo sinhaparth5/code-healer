@@ -140,6 +140,7 @@ module "sagemaker" {
   source = "./modules/sagemaker"
 
   project_name                          = var.project_name
+  environment                           = var.environment
   llm_container_image                   = var.sagemaker_llm_container_image
   llm_model_data_url                    = var.sagemaker_llm_model_data_url
   llm_environment_vars                  = var.sagemaker_llm_environment_vars
@@ -179,6 +180,7 @@ module "opensearch" {
   source = "./modules/opensearch"
 
   project_name                   = var.project_name
+  environment                    = var.environment
   aws_account_id                 = data.aws_caller_identity.current.account_id
   engine_version                 = var.opensearch_engine_version
   instance_type                  = var.opensearch_instance_type
