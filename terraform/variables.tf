@@ -662,3 +662,15 @@ variable "create_ci_user" {
   description = "Create CI user"
   default     = false
 }
+
+variable "enable_slack_notifications" {
+  type        = bool
+  description = "Enable Slack notifications"
+  default     = true
+}
+
+variable "enable_llm_analysis" {
+  type        = bool
+  description = "Enable LLM analysis"
+  default     = true
+}

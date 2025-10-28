@@ -13,23 +13,41 @@ resource "aws_lambda_function" "codehealer" {
     runtime = var.runtime
     timeout = var.timeout
     memory_size = var.memory_size
-
+    
     environment {
       variables = merge(
         {
-            ENVIRONMENT = var.environment
-            LOG_LEVEL = var.log_level
-            OPENSEARCH_ENDPOINT = var.opensearch_endpoint
-            DYNAMODB_TABLE = var.dynamodb_table_name
-            SAGEMAKER_ENDPOINT_LLM = var.sagemaker_llm_endpoint
-            SAGEMAKER_ENDPOINT_EMB = var.sagemaker_embedding_endpoint
-            SLACK_TOKEN_SECRET = var.slack_token_secret_name
-            GITHUB_TOKEN_SECRET = var.github_token_secret_name
-            ARGOCD_TOKEN_SECRET = var.argocd_token_secret_name
-            K8S_CONFIG_SECRET = var.k8s_config_secret_name
-            CONFIDENCE_THRESOLD = var.confidence_threshold
-            AUTO_FIX_ENABLED = var.auto_fix_enabled
-            MAX_RETRY_ATTEMPTS = var.max_retry_attempts
+          ENVIRONMENT = var.environment
+          LOG_LEVEL = var.log_level
+          AWS_REGION = var.aws_region
+          
+          # AWS Services
+          OPENSEARCH_ENDPOINT = var.opensearch_endpoint
+          DYNAMODB_TABLE_NAME = var.dynamodb_table_name
+          
+          # SageMaker Endpoints
+          SAGEMAKER_LLAMA_ENDPOINT = var.sagemaker_llm_endpoint
+          SAGEMAKER_EMBEDDING_ENDPOINT = var.sagemaker_embedding_endpoint
+          
+          # Secret ARNs (Lambda will fetch these at runtime)
+          GITHUB_TOKEN_SECRET_ARN = var.github_token_secret_arn
+          GITHUB_WEBHOOK_SECRET = var.github_webhook_secret_name
+          SLACK_TOKEN_SECRET_ARN = var.slack_token_secret_arn
+          ARGOCD_TOKEN_SECRET_ARN = var.argocd_token_secret_arn
+          K8S_CONFIG_SECRET_ARN = var.k8s_config_secret_arn
+          OPENAI_API_KEY_SECRET_ARN = var.openai_api_key_secret_arn
+          NVIDIA_NIM_API_KEY_SECRET_ARN = var.nvidia_nim_api_key_secret_arn
+          APP_CONFIG_SECRET_ARN = var.app_config_secret_arn
+          
+          # Application Configuration
+          CONFIDENCE_THRESHOLD = var.confidence_threshold
+          AUTO_FIX_ENABLED = var.auto_fix_enabled
+          MAX_RETRY_ATTEMPTS = var.max_retry_attempts
+          
+          # Feature Flags
+          ENABLE_AUTO_FIX = var.enable_auto_fix
+          ENABLE_SLACK_NOTIFICATIONS = var.enable_slack_notifications
+          ENABLE_LLM_ANALYSIS = var.enable_llm_analysis
         },
         var.additional_env_vars
       )
@@ -65,13 +83,16 @@ resource "aws_lambda_function" "authorizer" {
 
   environment {
     variables = {
-      "GITHUB_WEBHOOK_SECRET": var.github_webhook_secret_name
+      GITHUB_WEBHOOK_SECRET_ARN = var.github_webhook_secret_arn
+      AWS_REGION = var.aws_region
     }
   }
 
   tracing_config {
     mode = var.enable_xray ? "Active" : "PassThrough"
   }
+  
+  depends_on = [aws_cloudwatch_log_group.authorizer]
 }
 
 resource "aws_cloudwatch_log_group" "lambda" {
@@ -136,51 +157,84 @@ resource "aws_iam_role_policy" "lambda_permissions" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-        {
-            Effect = "Allow"
-            Action = [
-                "secretmanager:GetSecretValue"
-            ]
-            Resource = [
-                "arn:aws:secretmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.project_name}/*"
-            ]
-        },
-        {
-            Effect = "Allow"
-            Action = [
-                "dynamodb:PutItem",
-                "dynamodb:GetItem",
-                "dynamodb:UpdateItem",
-                "dynamodb:Query"
-            ]
-            Resource = var.dynamodb_table_arn
-        },
-        {
-            Effect = "Allow"
-            Action = [
-                "es:ESHttpPost",
-                "es:ESHttpPut",
-                "es:ESHttpGet"
-            ]
-            Resource = "${var.opensearch_domain_arn}/*"
-        },
-        {
-            Effect = "Allow"
-            Action = [
-                "sagemaker:InvokeEndpoint"
-            ]
-            Resource = [
-                var.sagemaker_llm_endpoint_arn,
-                var.sagemaker_embedding_endpoint_arn
-            ]
-        },
-        {
-            Effect = "Allow"
-            Action = [
-                "sqs:SendMessage"
-            ]
-            Resource = aws_sqs_queue.dlq.arn
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = [
+          var.github_token_secret_arn,
+          var.github_webhook_secret_arn,
+          var.slack_token_secret_arn,
+          var.argocd_token_secret_arn,
+          var.k8s_config_secret_arn,
+          var.openai_api_key_secret_arn,
+          var.nvidia_nim_api_key_secret_arn,
+          var.app_config_secret_arn
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt"
+        ]
+        Resource = var.kms_key_arn != null ? [var.kms_key_arn] : []
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "secretsmanager.${var.aws_region}.amazonaws.com"
+          }
         }
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:Query",
+          "dynamodb:Scan"
+        ]
+        Resource = [
+          var.dynamodb_table_arn,
+          "${var.dynamodb_table_arn}/index/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "es:ESHttpPost",
+          "es:ESHttpPut",
+          "es:ESHttpGet"
+        ]
+        Resource = "${var.opensearch_domain_arn}/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "sagemaker:InvokeEndpoint"
+        ]
+        Resource = [
+          var.sagemaker_llm_endpoint_arn,
+          var.sagemaker_embedding_endpoint_arn
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage"
+        ]
+        Resource = aws_sqs_queue.dlq.arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:${var.aws_region}:${var.aws_account_id}:log-group:/aws/lambda/${var.project_name}-*:*"
+      }
     ]
   })
 }

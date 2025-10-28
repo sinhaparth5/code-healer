@@ -82,14 +82,32 @@ module "lambda" {
   sagemaker_llm_endpoint_arn       = module.sagemaker.llm_endpoint_arn
   sagemaker_embedding_endpoint     = module.sagemaker.embedding_endpoint_name
   sagemaker_embedding_endpoint_arn = module.sagemaker.embedding_endpoint_arn
-  slack_token_secret_name          = aws_secretsmanager_secret.slack_token.name
-  github_token_secret_name         = aws_secretsmanager_secret.github_token.name
-  github_webhook_secret_name       = aws_secretsmanager_secret.github_webhook.name
-  argocd_token_secret_name         = aws_secretsmanager_secret.argocd_token.name
-  k8s_config_secret_name           = aws_secretsmanager_secret.k8s_config.name
+  
+  # Secret ARNs from the secrets module
+  github_token_secret_arn          = module.secrets.github_token_secret_arn
+  github_token_secret_name         = module.secrets.github_token_secret_name
+  github_webhook_secret_arn        = module.secrets.github_webhook_secret_arn
+  github_webhook_secret_name       = module.secrets.github_webhook_secret_name
+  slack_token_secret_arn           = module.secrets.slack_token_secret_arn
+  slack_token_secret_name          = module.secrets.slack_token_secret_name
+  argocd_token_secret_arn          = module.secrets.argocd_token_secret_arn
+  argocd_token_secret_name         = module.secrets.argocd_token_secret_name
+  k8s_config_secret_arn            = module.secrets.k8s_config_secret_arn
+  k8s_config_secret_name           = module.secrets.k8s_config_secret_name
+  openai_api_key_secret_arn        = module.secrets.openai_api_key_secret_arn
+  openai_api_key_secret_name       = module.secrets.openai_api_key_secret_name
+  nvidia_nim_api_key_secret_arn    = module.secrets.nvidia_nim_api_key_secret_arn
+  nvidia_nim_api_key_secret_name   = module.secrets.nvidia_nim_api_key_secret_name
+  app_config_secret_arn            = module.secrets.app_config_secret_arn
+  app_config_secret_name           = module.secrets.app_config_secret_name
+  
+  kms_key_arn                      = var.kms_key_arn
   confidence_threshold             = var.confidence_threshold
   auto_fix_enabled                 = var.auto_fix_enabled
   max_retry_attempts               = var.max_retry_attempts
+  enable_auto_fix                  = var.auto_fix_enabled == "true"
+  enable_slack_notifications       = var.enable_slack_notifications
+  enable_llm_analysis              = var.enable_llm_analysis
   subnet_ids                       = var.enable_vpc ? var.subnet_ids : []
   security_group_ids               = var.enable_vpc ? [aws_security_group.lambda[0].id] : []
   enable_xray                      = var.enable_xray
@@ -97,7 +115,7 @@ module "lambda" {
   additional_env_vars              = var.lambda_additional_env_vars
   tags                             = local.common_tags
 
-  depends_on = [module.iam]
+  depends_on = [module.iam, module.secrets]
 }
 
 module "api_gateway" {
@@ -338,51 +356,6 @@ resource "aws_s3_bucket_public_access_block" "data_capture" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
-}
-
-resource "aws_secretsmanager_secret" "slack_token" {
-  name                    = "${var.project_name}/slack-token"
-  description             = "Slack API token for CodeHealer"
-  recovery_window_in_days = var.secret_recovery_window_days
-  kms_key_id              = var.kms_key_arn
-
-  tags = local.common_tags
-}
-
-resource "aws_secretsmanager_secret" "github_token" {
-  name                    = "${var.project_name}/github-token"
-  description             = "GitHub API token for CodeHealer"
-  recovery_window_in_days = var.secret_recovery_window_days
-  kms_key_id              = var.kms_key_arn
-
-  tags = local.common_tags
-}
-
-resource "aws_secretsmanager_secret" "github_webhook" {
-  name                    = "${var.project_name}/github-webhook-secret"
-  description             = "GitHub webhook secret for CodeHealer"
-  recovery_window_in_days = var.secret_recovery_window_days
-  kms_key_id              = var.kms_key_arn
-
-  tags = local.common_tags
-}
-
-resource "aws_secretsmanager_secret" "argocd_token" {
-  name                    = "${var.project_name}/argocd-token"
-  description             = "ArgoCD API token for CodeHealer"
-  recovery_window_in_days = var.secret_recovery_window_days
-  kms_key_id              = var.kms_key_arn
-
-  tags = local.common_tags
-}
-
-resource "aws_secretsmanager_secret" "k8s_config" {
-  name                    = "${var.project_name}/k8s-config"
-  description             = "Kubernetes config for CodeHealer"
-  recovery_window_in_days = var.secret_recovery_window_days
-  kms_key_id              = var.kms_key_arn
-
-  tags = local.common_tags
 }
 
 resource "aws_security_group" "lambda" {
