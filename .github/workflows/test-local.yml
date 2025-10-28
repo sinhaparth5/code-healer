@@ -23,11 +23,22 @@ jobs:
           chmod +x scripts/*.sh
           chmod +x init-aws.sh
       
-      - name: Install AWS CLI and dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y awscli jq curl
+          sudo apt-get install -y jq curl unzip
+          
+          # Install AWS CLI v2
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install
+          
+          # Install awscli-local
           pip install awscli-local
+          
+          # Verify installations
+          aws --version
+          awslocal --version
       
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v2
@@ -35,7 +46,7 @@ jobs:
           terraform_version: 1.5.0
       
       - name: Start LocalStack environment
-        run: ./scripts/start-local.sh
+        run: bash ./scripts/start-local.sh
         env:
           TF_INPUT: false
       
@@ -48,16 +59,16 @@ jobs:
       - name: Verify services are healthy
         run: |
           echo "Checking LocalStack..."
-          curl -s http://localhost:4566/_localstack/health || echo "LocalStack not ready"
+          curl -s http://localhost:4566/_localstack/health | jq '.' || echo "LocalStack not ready"
           
           echo "Checking Elasticsearch..."
-          curl -s http://localhost:9200/_cluster/health || echo "Elasticsearch not ready"
+          curl -s http://localhost:9200/_cluster/health | jq '.' || echo "Elasticsearch not ready"
           
           echo "Checking Mock SageMaker..."
           curl -s http://localhost:8080/health || echo "Mock SageMaker not ready"
       
       - name: Run integration tests
-        run: ./scripts/test-local.sh
+        run: bash ./scripts/test-local.sh
       
       - name: View LocalStack logs on failure
         if: failure()
@@ -73,4 +84,4 @@ jobs:
       
       - name: Stop environment
         if: always()
-        run: ./scripts/stop-local.sh
+        run: bash ./scripts/stop-local.sh
