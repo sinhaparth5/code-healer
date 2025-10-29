@@ -1,6 +1,7 @@
 variable "project_name" {
   type        = string
   description = "Project name"
+  default = "DevFlowFix"
 }
 
 variable "environment" {
@@ -11,6 +12,7 @@ variable "environment" {
 variable "aws_region" {
   type        = string
   description = "AWS region"
+  default = "us-east-1"
 }
 
 variable "vpc_id" {
@@ -134,6 +136,7 @@ variable "api_gateway_throttle_rate_limit" {
 variable "sagemaker_llm_container_image" {
   type        = string
   description = "SageMaker LLM container image"
+  default     = "mock-llm:latest" 
 }
 
 variable "sagemaker_llm_model_data_url" {
@@ -175,6 +178,7 @@ variable "sagemaker_llm_serverless_memory_size" {
 variable "sagemaker_embedding_container_image" {
   type        = string
   description = "SageMaker embedding container image"
+  default     = "mock-embedding:latest"
 }
 
 variable "sagemaker_embedding_model_data_url" {
@@ -673,4 +677,73 @@ variable "enable_llm_analysis" {
   type        = bool
   description = "Enable LLM analysis"
   default     = true
+}
+
+# Secret values
+variable "github_token" {
+  type        = string
+  description = "GitHub personal access token"
+  default     = ""
+  sensitive   = true
+}
+
+variable "github_webhook_secret" {
+  type        = string
+  description = "GitHub webhook secret"
+  default     = ""
+  sensitive   = true
+}
+
+variable "slack_token" {
+  type        = string
+  description = "Slack bot token"
+  default     = ""
+  sensitive   = true
+}
+
+variable "openai_api_key" {
+  type        = string
+  description = "OpenAI API key"
+  default     = ""
+  sensitive   = true
+}
+
+variable "argocd_token" {
+  type        = string
+  description = "ArgoCD API token"
+  default     = ""
+  sensitive   = true
+}
+
+variable "k8s_config" {
+  type        = string
+  description = "Kubernetes config"
+  default     = ""
+  sensitive   = true
+}
+
+variable "nvidia_nim_api_key" {
+  type        = string
+  description = "NVIDIA NIM API key"
+  default     = ""
+  sensitive   = true
+}
+
+# Configuration values
+variable "llm_provider" {
+  type        = string
+  description = "LLM provider"
+  default     = "openai"
+}
+
+variable "slack_channel_id" {
+  type        = string
+  description = "Slack channel ID"
+  default     = ""
+}
+
+variable "slack_senior_dev_id" {
+  type        = string
+  description = "Slack senior dev user ID"
+  default     = ""
 }
