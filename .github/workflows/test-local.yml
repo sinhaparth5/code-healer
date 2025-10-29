@@ -1,0 +1,87 @@
+name: Local Integration Tests
+
+on: [pull_request, push]
+
+jobs:
+  test-local:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Verify Docker Compose
+        run: |
+          docker --version
+          docker compose version
+      
+      - name: Make scripts executable
+        run: |
+          chmod +x scripts/*.sh
+          chmod +x init-aws.sh
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl unzip
+          
+          # Install AWS CLI v2
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install --update
+          
+          # Install awscli-local
+          pip install awscli-local
+          
+          # Verify installations
+          aws --version
+          awslocal --version
+      
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+      
+      - name: Start LocalStack environment
+        run: bash ./scripts/start-local.sh
+        env:
+          TF_INPUT: false
+      
+      - name: Wait for services to stabilize
+        run: sleep 30
+      
+      - name: Show running containers
+        run: docker ps
+      
+      - name: Verify services are healthy
+        run: |
+          echo "Checking LocalStack..."
+          curl -s http://localhost:4566/_localstack/health | jq '.' || echo "LocalStack not ready"
+          
+          echo "Checking Elasticsearch..."
+          curl -s http://localhost:9200/_cluster/health | jq '.' || echo "Elasticsearch not ready"
+          
+          echo "Checking Mock SageMaker..."
+          curl -s http://localhost:8080/health || echo "Mock SageMaker not ready"
+      
+      - name: Run integration tests
+        run: bash ./scripts/test-local.sh
+      
+      - name: View LocalStack logs on failure
+        if: failure()
+        run: docker compose -f compose.localstack.yml logs localstack
+      
+      - name: View Elasticsearch logs on failure
+        if: failure()
+        run: docker compose -f compose.localstack.yml logs elasticsearch
+      
+      - name: View Mock SageMaker logs on failure
+        if: failure()
+        run: docker compose -f compose.localstack.yml logs mock-sagemaker
+      
+      - name: Stop environment
+        if: always()
+        run: bash ./scripts/stop-local.sh

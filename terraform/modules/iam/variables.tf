@@ -12,10 +12,12 @@ variable "aws_account_id" {
 
 variable "authorizer_lambda_arn" {
   type = string
+  default = ""
 }
 
 variable "lambda_function_arn" {
   type = string
+  default = ""
 }
 
 variable "opensearch_domain_arn" {

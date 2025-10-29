@@ -1,0 +1,77 @@
+services:
+  localstack:
+    image: localstack/localstack:latest
+    container_name: codehealer-localstack
+    ports:
+      - "4566:4566"            # LocalStack Gateway
+      - "4510-4559:4510-4559"  # External services port range
+    environment:
+      - SERVICES=s3,dynamodb,lambda,apigateway,secretsmanager,sns,sqs,iam,sts,cloudwatch,logs,kms
+      - DEBUG=1
+      - LAMBDA_EXECUTOR=docker-reuse
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - AWS_DEFAULT_REGION=us-east-1
+      - DISABLE_CORS_CHECKS=1
+      - PERSISTENCE=1
+      - LAMBDA_RUNTIME_ENVIRONMENT_TIMEOUT=300
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./localstack-data:/var/lib/localstack"
+      - "./init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh"
+    networks:
+      - codehealer-local
+
+  # Elasticsearch as OpenSearch replacement
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: codehealer-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - codehealer-local
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Mock SageMaker Service (LLM + Embeddings)
+  mock-sagemaker:
+    build: 
+      context: ./local-mock-services
+      dockerfile: Dockerfile.sagemaker
+    container_name: codehealer-mock-sagemaker
+    ports:
+      - "8080:8080"  # LLM endpoint
+      - "8081:8081"  # Embedding endpoint
+    environment:
+      - LOG_LEVEL=INFO
+      - LLM_PORT=8080
+      - EMBEDDING_PORT=8081
+    networks:
+      - codehealer-local
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  codehealer-local:
+    driver: bridge
+
+volumes:
+  elasticsearch-data:
+    driver: local
