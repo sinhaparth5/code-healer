@@ -209,3 +209,6 @@ __marimo__/
 .terraform
 localstack-data/*
 .terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+tfplan-local
