@@ -69,27 +69,27 @@ output "data_capture_bucket_name" {
 }
 
 output "slack_token_secret_arn" {
-  value       = aws_secretsmanager_secret.slack_token.arn
+  value       = module.secrets.slack_token_secret_arn
   description = "Slack token secret ARN"
 }
 
 output "github_token_secret_arn" {
-  value       = aws_secretsmanager_secret.github_token.arn
+  value       = module.secrets.github_token_secret_arn
   description = "GitHub token secret ARN"
 }
 
 output "github_webhook_secret_arn" {
-  value       = aws_secretsmanager_secret.github_webhook.arn
+  value       = module.secrets.github_webhook_secret_arn
   description = "GitHub webhook secret ARN"
 }
 
 output "argocd_token_secret_arn" {
-  value       = aws_secretsmanager_secret.argocd_token.arn
+  value       = module.secrets.argocd_token_secret_arn
   description = "ArgoCD token secret ARN"
 }
 
 output "k8s_config_secret_arn" {
-  value       = aws_secretsmanager_secret.k8s_config.arn
+  value       = module.secrets.k8s_config_secret_arn
   description = "Kubernetes config secret ARN"
 }
 

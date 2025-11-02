@@ -1,8 +1,11 @@
 environment = "local"
 
-# Network - LocalStack doesn't need real VPC
-vpc_id     = "vpc-local"
-subnet_ids = ["subnet-local-1", "subnet-local-2"]
+# # Network - LocalStack doesn't need real VPC
+# vpc_id     = "vpc-local"
+# subnet_ids = ["subnet-12345678", "subnet-87654321"]
+enable_vpc = false
+vpc_id     = ""
+subnet_ids = []
 
 # Lambda configuration (minimal for local)
 lambda_memory_size = 512
