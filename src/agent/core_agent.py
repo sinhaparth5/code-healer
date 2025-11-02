@@ -237,53 +237,6 @@ class CodeHealerAgent:
             logger.error(f"Failed to normalize event: {e}")
             return None
 
-    def _extract_context(self, raw_event: Dict[str, Any]) -> Dict[str, Any]:
-        context = {
-            "environment": "unknown",
-            "service": "unknown", 
-            "component": "unknown",
-            "namespace": None
-        }
-        
-        if "workflow_run" in raw_event:
-            workflow_run = raw_event["workflow_run"]
-            context.update({
-                "service": raw_event.get("repository", {}).get("name", "unknown"),
-                "component": workflow_run.get("name", "unknown"),
-                "environment": self._infer_environment_from_branch(
-                    workflow_run.get("head_branch", "")
-                )
-            })
-        
-        elif "application" in raw_event:
-            app = raw_event["application"]
-            context.update({
-                "service": app.get("metadata", {}).get("name", "unknown"),
-                "namespace": app.get("metadata", {}).get("namespace"),
-                "environment": self._infer_environment_from_namespace(
-                    app.get("metadata", {}).get("namespace", "")
-                )
-            })
-        
-        return context
-
-    def _extract_error_log(self, raw_event: Dict[str, Any]) -> str:
-        if "workflow_run" in raw_event:
-            return f"GitHub Actions workflow failed: {raw_event.get('workflow_run', {}).get('conclusion', 'unknown')}"
-        elif "application" in raw_event:
-            return f"ArgoCD application sync failed: {raw_event.get('application', {}).get('status', {})}"
-        else:
-            return json.dumps(raw_event, indent=2)
-
-    async def _gather_system_state(self, raw_event: Dict[str, Any]) -> Dict[str, Any]:
-        return {
-            "timestamp": datetime.utcnow().isoformat(),
-            "active_incidents": len(self.active_incidents),
-            "recent_changes": [],
-            "resource_utilization": {},
-            "dependencies_status": {}
-        }
-
     async def _analyze_failure(self, incident: IncidentEvent) -> Optional[FailureAnalysis]:
         return await self.failure_analyzer.analyze_failure(incident)
 
@@ -395,30 +348,6 @@ class CodeHealerAgent:
     def _get_min_confidence_threshold(self, environment: str) -> float:
         thresholds = self.config.get("confidence_thresholds", {})
         return thresholds.get(environment, thresholds.get("default", 0.85))
-
-    def _infer_environment_from_branch(self, branch: str) -> str:
-        branch = branch.lower()
-        if "prod" in branch or "main" in branch or "master" in branch:
-            return "production"
-        elif "stag" in branch or "staging" in branch:
-            return "staging"
-        elif "dev" in branch or "develop" in branch:
-            return "development"
-        else:
-            return "unknown"
-
-    def _infer_environment_from_namespace(self, namespace: str) -> str:
-        if not namespace:
-            return "unknown"
-        namespace = namespace.lower()
-        if "prod" in namespace:
-            return "production"
-        elif "stag" in namespace:
-            return "staging"
-        elif "dev" in namespace:
-            return "development"
-        else:
-            return "unknown"
 
     async def get_incident_status(self, incident_id: str) -> Optional[Dict[str, Any]]:
         if incident_id in self.active_incidents:
