@@ -1,4 +1,3 @@
-import json
 import time
 from typing import Dict, List, Optional, Any
 from github import Github, GithubException
@@ -40,21 +39,39 @@ class GitHubClient:
         try:
             url = f"https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}/logs"
             logger.info(f"Fetching workflow logs from: {url}")
-            logger.info(f"Using token: {self.token[:10]}..." if self.token else "No token available")
-            response = self.session.get(url, allow_redirects=True)
             
+            response = self.session.get(url, allow_redirects=False)
+
             if response.status_code == 401:
-                logger.error(f"GitHub token authentication failed. Token may be invalid or expired.")
-                return "=== AUTHENTICATION ERROR ===\nGitHub token authentication failed. Token may be invalid or expired.\n"
-            elif response.status_code == 403:
-                logger.error(f"GitHub token doesn't have required permissions for accessing workflow logs.")
-                return "=== PERMISSION ERROR ===\nGitHub token doesn't have required permissions for accessing workflow logs.\n"
+                logger.error("GitHub token authentication failed. Token may be invalid or expired.")
+                return "=== AUTHENTICATION ERROR ===\nGitHub token authentication failed.\n"
             
-            response.raise_for_status()
-            return response.text
+            if response.status_code == 403:
+                logger.error("GitHub token doesn't have required permissions for accessing workflow logs.")
+                return "=== PERMISSION ERROR ===\nInsufficient permissions for workflow logs.\n"
+            
+            if response.status_code != 302:
+                response.raise_for_status()
+                return response.text
+            
+            redirect_url = response.headers['Location']
+            logger.info(f"Following redirect to: {redirect_url}")
+
+            download_response = requests.get(redirect_url, allow_redirects=True)
+            download_response.raise_for_status()
+
+            import zipfile
+            import io
+
+            logs_text = ""
+            with zipfile.ZipFile(io.BytesIO(download_response.content)) as z:
+                for filename in z.namelist():
+                    with z.open(filename) as f:
+                        logs_text += f"=== {filename} ===\n{f.read().decode('utf-8', errors='replace')}\n\n"
+            return logs_text
         except Exception as e:
             logger.error(f"Failed to get workflow logs: {e}")
-            return f"=== ERROR FETCHING LOGS ===\nFailed to fetch logs: {str(e)}\n"
+            return f"=== ERROR FETCHING LOGS ===\n{str(e)}\n"
 
     def list_workflow_jobs(self, owner: str, repo: str, run_id: int) -> List[Dict[str, Any]]:
         try:
