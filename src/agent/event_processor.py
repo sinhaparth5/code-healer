@@ -39,8 +39,11 @@ class ParsedEventMetadata:
 
 class EventProcessor:
     
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], github_client=None, argocd_client=None, slack_client=None):
         self.config = config
+        self.github_client = github_client
+        self.argocd_client = argocd_client
+        self.slack_client = slack_client
         self.event_config = config.get("event_processing", {})
         
         self.environment_patterns = self.event_config.get("environment_patterns", {
@@ -399,6 +402,7 @@ class EventProcessor:
         metadata: ParsedEventMetadata
     ) -> str:
         workflow_run = raw_event.get("workflow_run", {})
+        repository = raw_event.get("repository", {})
         
         error_info = f"""GitHub Actions Workflow Failure
 Repository: {metadata.repository}
@@ -411,6 +415,63 @@ URL: {workflow_run.get('html_url', 'N/A')}
 
 Commit: {workflow_run.get('head_sha', 'unknown')}
 Message: {workflow_run.get('head_commit', {}).get('message', 'N/A')}
+
+"""
+        
+        # Fetch actual workflow logs if GitHub client is available
+        if self.github_client and metadata.workflow_id:
+            try:
+                owner = repository.get("owner", {}).get("login", "")
+                repo_name = repository.get("name", "")
+                
+                if owner and repo_name:
+                    # Get workflow logs
+                    workflow_logs = self.github_client.get_workflow_logs(owner, repo_name, int(metadata.workflow_id))
+                    if workflow_logs:
+                        error_info += f"\n=== WORKFLOW LOGS ===\n{workflow_logs}\n"
+                    
+                    # Get individual job logs for more detailed error information
+                    jobs = self.github_client.list_workflow_jobs(owner, repo_name, int(metadata.workflow_id))
+                    for job in jobs:
+                        if job.get("conclusion") in ["failure", "cancelled", "timed_out"]:
+                            job_logs = self.github_client.get_job_logs(owner, repo_name, str(job.get("id")))
+                            if job_logs:
+                                error_info += f"\n=== JOB LOGS: {job.get('name', 'Unknown')} ===\n{job_logs}\n"
+                
+            except Exception as e:
+                logger.error(f"Failed to fetch GitHub logs: {e}")
+                error_info += f"\n=== ERROR FETCHING LOGS ===\nFailed to fetch logs: {str(e)}\n"
+        else:
+            error_info += "\n=== LOGS NOT AVAILABLE ===\nGitHub client not configured or workflow ID missing\n"
+        
+        # Add mock logs for demonstration (remove this in production)
+        error_info += f"""
+=== MOCK FAILURE ANALYSIS ===
+This is a simulated analysis of the GitHub Actions failure:
+
+Workflow Run ID: {metadata.workflow_id}
+Repository: {metadata.repository}
+Branch: {workflow_run.get('head_branch', 'unknown')}
+
+Common CI/CD Failure Patterns Detected:
+1. Build compilation errors
+2. Test failures
+3. Dependency resolution issues
+4. Environment configuration problems
+5. Network connectivity issues
+
+Recommended Actions:
+- Check recent code changes for syntax errors
+- Verify all tests are passing locally
+- Review dependency versions for conflicts
+- Validate environment variables and secrets
+- Check for any external service outages
+
+Next Steps:
+- Analyze commit history for breaking changes
+- Run local builds to reproduce the issue
+- Check CI/CD logs for specific error messages
+- Consider rolling back to last known good state if critical
 """
         
         return error_info

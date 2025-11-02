@@ -35,7 +35,7 @@ def get_agent() -> CodeHealerAgent:
     global agent
     
     if agent is None:
-        # Validate required configuration
+                # Validate required configuration
         github_token = os.getenv("GITHUB_TOKEN")
         if not github_token:
             logger.warning("GITHUB_TOKEN not configured - GitHub integration disabled")
@@ -47,7 +47,8 @@ def get_agent() -> CodeHealerAgent:
         # Build comprehensive configuration
         agent_config = {
             "github": {
-                "token": github_token or ""
+                "token": github_token or "",
+                "repo": os.getenv("GITHUB_REPO", "")
             },
             "argocd": {
                 "server_url": os.getenv("ARGOCD_SERVER_URL", ""),

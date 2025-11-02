@@ -144,7 +144,12 @@ class CodeHealerAgent:
             from .remediation_coordinator import RemediationCoordinator
             from .feedback_system import FeedbackSystem
             
-            self.event_processor = EventProcessor(self.config)
+            self.event_processor = EventProcessor(
+                self.config,
+                github_client=getattr(self, 'github_client', None),
+                argocd_client=getattr(self, 'argocd_client', None),
+                slack_client=getattr(self, 'slack_client', None)
+            )
             self.failure_analyzer = FailureAnalyzer(self.config)
             self.knowledge_retriever = KnowledgeRetriever(
                 self.config, 
