@@ -331,7 +331,6 @@ echo "✅ IAM roles created"
 echo "Waiting 10 seconds for IAM roles to propagate..."
 sleep 10
 echo ""
-
 # ============================================
 # STEP 4: PACKAGE AND DEPLOY LAMBDA
 # ============================================
@@ -397,11 +396,11 @@ echo "📦 Package size: $SIZE"
 # Create or update Lambda function
 if aws lambda get-function --function-name ${PROJECT_NAME}-handler --region ${AWS_REGION} 2>/dev/null; then
   echo "Lambda handler already exists, updating code..."
-  
+ 
   if [ $SIZE_BYTES -gt 52428800 ]; then
     echo "📤 Uploading to S3 (package > 50MB)..."
     aws s3 cp lambda_package.zip s3://${PROJECT_NAME}-deployment-${AWS_ACCOUNT_ID}/lambda_package.zip --region ${AWS_REGION}
-    
+   
     aws lambda update-function-code \
       --function-name ${PROJECT_NAME}-handler \
       --s3-bucket ${PROJECT_NAME}-deployment-${AWS_ACCOUNT_ID} \
@@ -413,14 +412,46 @@ if aws lambda get-function --function-name ${PROJECT_NAME}-handler --region ${AW
       --zip-file fileb://lambda_package.zip \
       --region ${AWS_REGION} >/dev/null
   fi
-  
+ 
+  # Wait for the code update to complete
+  echo "⏳ Waiting for code update to complete..."
+  aws lambda wait function-updated --function-name ${PROJECT_NAME}-handler --region ${AWS_REGION} 2>/dev/null || {
+    echo "   Using manual wait..."
+    sleep 10
+    MAX_ATTEMPTS=60
+    ATTEMPT=0
+    while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+      STATE=$(aws lambda get-function --function-name ${PROJECT_NAME}-handler --region ${AWS_REGION} --query 'Configuration.State' --output text 2>/dev/null)
+      LAST_UPDATE_STATUS=$(aws lambda get-function --function-name ${PROJECT_NAME}-handler --region ${AWS_REGION} --query 'Configuration.LastUpdateStatus' --output text 2>/dev/null)
+     
+      if [ "$STATE" = "Active" ] && [ "$LAST_UPDATE_STATUS" = "Successful" ]; then
+        echo "   ✅ Code update completed"
+        break
+      fi
+     
+      if [ "$LAST_UPDATE_STATUS" = "Failed" ]; then
+        echo "   ❌ Code update failed"
+        exit 1
+      fi
+     
+      echo "   State: $STATE, Status: $LAST_UPDATE_STATUS (attempt $((ATTEMPT+1))/$MAX_ATTEMPTS)"
+      sleep 5
+      ATTEMPT=$((ATTEMPT+1))
+    done
+   
+    if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+      echo "   ❌ Timeout waiting for code update"
+      exit 1
+    fi
+  }
+ 
 else
   echo "Creating Lambda handler..."
-  
+ 
   if [ $SIZE_BYTES -gt 52428800 ]; then
     echo "📤 Uploading to S3 (package > 50MB)..."
     aws s3 cp lambda_package.zip s3://${PROJECT_NAME}-deployment-${AWS_ACCOUNT_ID}/lambda_package.zip --region ${AWS_REGION}
-    
+   
     aws lambda create-function \
       --function-name ${PROJECT_NAME}-handler \
       --runtime python3.11 \
@@ -441,38 +472,56 @@ else
       --memory-size 1024 \
       --region ${AWS_REGION} >/dev/null
   fi
+ 
+  # Wait for function to be created
+  echo "⏳ Waiting for Lambda function to be created..."
+  aws lambda wait function-active --function-name ${PROJECT_NAME}-handler --region ${AWS_REGION}
 fi
 
 # Update Lambda environment variables
 echo "⚙️  Configuring Lambda environment variables..."
+
+# Create environment variables JSON file
+cat > /tmp/lambda-env.json <<EOF
+{
+  "Variables": {
+    "ENVIRONMENT": "${ENVIRONMENT}",
+    "PROJECT_NAME": "${PROJECT_NAME}",
+    "LOG_LEVEL": "INFO",
+    "GITHUB_TOKEN_SECRET_NAME": "${PROJECT_NAME}/${ENVIRONMENT}/github-token",
+    "GITHUB_WEBHOOK_SECRET_NAME": "${PROJECT_NAME}/${ENVIRONMENT}/github-webhook-secret",
+    "SLACK_TOKEN_SECRET_NAME": "${PROJECT_NAME}/${ENVIRONMENT}/slack-token",
+    "NVIDIA_API_KEY_SECRET_NAME": "${PROJECT_NAME}/${ENVIRONMENT}/nvidia-nim-api-key",
+    "OPENAI_API_KEY_SECRET_NAME": "${PROJECT_NAME}/${ENVIRONMENT}/openai-api-key",
+    "APP_CONFIG_SECRET_NAME": "${PROJECT_NAME}/${ENVIRONMENT}/app-config",
+    "CONFIDENCE_THRESHOLD_PROD": "0.92",
+    "CONFIDENCE_THRESHOLD_STAGING": "0.85",
+    "CONFIDENCE_THRESHOLD_DEV": "0.75",
+    "CONFIDENCE_THRESHOLD_DEFAULT": "0.85",
+    "VECTOR_SIMILARITY_THRESHOLD": "0.75",
+    "VECTOR_MAX_RESULTS": "10",
+    "SLACK_NOTIFICATION_CHANNEL": "alerts",
+    "SLACK_SEARCH_CHANNELS": "devops,alerts,incidents",
+    "SLACK_TIME_WINDOW_DAYS": "180",
+    "SLACK_MAX_RESULTS": "20",
+    "APPROVAL_PROD_ALWAYS": "true",
+    "APPROVAL_HIGH_RISK": "true",
+    "APPROVAL_LOW_CONF_THRESHOLD": "0.9"
+  }
+}
+EOF
+
+# Update Lambda with environment variables from file
 aws lambda update-function-configuration \
   --function-name ${PROJECT_NAME}-handler \
-  --environment "Variables={
-    ENVIRONMENT=${ENVIRONMENT},
-    PROJECT_NAME=${PROJECT_NAME},
-    AWS_REGION=${AWS_REGION},
-    LOG_LEVEL=INFO,
-    GITHUB_TOKEN_SECRET_NAME=${PROJECT_NAME}/${ENVIRONMENT}/github-token,
-    GITHUB_WEBHOOK_SECRET_NAME=${PROJECT_NAME}/${ENVIRONMENT}/github-webhook-secret,
-    SLACK_TOKEN_SECRET_NAME=${PROJECT_NAME}/${ENVIRONMENT}/slack-token,
-    NVIDIA_API_KEY_SECRET_NAME=${PROJECT_NAME}/${ENVIRONMENT}/nvidia-nim-api-key,
-    OPENAI_API_KEY_SECRET_NAME=${PROJECT_NAME}/${ENVIRONMENT}/openai-api-key,
-    APP_CONFIG_SECRET_NAME=${PROJECT_NAME}/${ENVIRONMENT}/app-config,
-    CONFIDENCE_THRESHOLD_PROD=0.92,
-    CONFIDENCE_THRESHOLD_STAGING=0.85,
-    CONFIDENCE_THRESHOLD_DEV=0.75,
-    CONFIDENCE_THRESHOLD_DEFAULT=0.85,
-    VECTOR_SIMILARITY_THRESHOLD=0.75,
-    VECTOR_MAX_RESULTS=10,
-    SLACK_NOTIFICATION_CHANNEL=#alerts,
-    SLACK_SEARCH_CHANNELS=devops,alerts,incidents,
-    SLACK_TIME_WINDOW_DAYS=180,
-    SLACK_MAX_RESULTS=20,
-    APPROVAL_PROD_ALWAYS=true,
-    APPROVAL_HIGH_RISK=true,
-    APPROVAL_LOW_CONF_THRESHOLD=0.9
-  }" \
+  --environment file:///tmp/lambda-env.json \
   --region ${AWS_REGION} >/dev/null
+
+echo "✅ Lambda environment variables configured"
+
+# Wait for configuration update to complete
+echo "⏳ Waiting for configuration update to complete..."
+sleep 5
 
 export LAMBDA_ARN=$(aws lambda get-function --function-name ${PROJECT_NAME}-handler --query 'Configuration.FunctionArn' --output text --region ${AWS_REGION})
 

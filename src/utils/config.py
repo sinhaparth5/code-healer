@@ -33,8 +33,8 @@ class Config(BaseSettings):
     
     # NVIDIA NIM Configuration
     nvidia_nim_api_key: str = os.getenv('NVIDIA_NIM_API_KEY', '')
-    nvidia_nim_endpoint: str = os.getenv('NVIDIA_NIM_ENDPOINT', 'https://api.nvcf.nvidia.com/v2/nvcf/pexec/functions')
-    nvidia_nim_model: str = os.getenv('NVIDIA_NIM_MODEL', 'llama-3.1-nemotron-8b')
+    nvidia_nim_endpoint: str = os.getenv('NVIDIA_NIM_ENDPOINT', 'https://integrate.api.nvidia.com/v1')
+    nvidia_nim_model: str = os.getenv('NVIDIA_NIM_MODEL', 'nvidia/llama-3.1-nemotron-nano-vl-8b-v1')
     
     # NVIDIA NIM Embedding Configuration
     nvidia_nim_embedding_api_key: str = os.getenv('NVIDIA_NIM_EMBEDDING_API_KEY', '')
