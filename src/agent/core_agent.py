@@ -77,6 +77,9 @@ class ResolutionCandidate:
     environment_match: bool
     code_changes: List[Dict[str, Any]]
     estimated_duration: int
+    success_indicators: List[str] = field(default_factory=list)
+    rollback_instructions: List[str] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 @dataclass
 class RemediationResult:
