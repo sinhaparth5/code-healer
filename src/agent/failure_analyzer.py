@@ -3,11 +3,9 @@ import re
 import asyncio
 import requests
 from typing import Dict, List, Optional, Any
-from datetime import datetime
 from dataclasses import dataclass
 
 from utils.logger import get_logger
-from utils.config import config
 from agent.core_agent import FailureCategory, Fixability, FailureAnalysis, IncidentEvent
 
 logger = get_logger(__name__)
@@ -197,7 +195,7 @@ class FailureAnalyzer:
         Main failure analysis method with enhanced log fetching and LLM integration
         
         Process:
-        1. Fetch detailed logs from source platforms
+        1. Use logs already fetched by EventProcessor
         2. Perform pattern matching analysis
         3. Generate comprehensive LLM analysis  
         4. Combine analyses with confidence weighting
@@ -212,9 +210,9 @@ class FailureAnalyzer:
         try:
             logger.info(f"Starting enhanced analysis for incident: {incident.incident_id}")
             
-            # Step 1: Fetch detailed logs from source platforms
-            detailed_logs = await self._fetch_detailed_logs(incident)
-            
+            # Step 1: Use logs already fetched by EventProcessor
+            detailed_logs = incident.error_log
+
             # Step 2: Perform pattern matching analysis with detailed logs
             pattern_analysis = self._pattern_match_analysis(incident, detailed_logs)
             
@@ -238,133 +236,6 @@ class FailureAnalyzer:
         except Exception as e:
             logger.error(f"Failed to analyze incident {incident.incident_id}: {e}", exc_info=True)
             return self._create_fallback_analysis(incident)
-
-    async def _fetch_detailed_logs(self, incident: IncidentEvent) -> str:
-        """Fetch detailed logs from the source platform"""
-        try:
-            if incident.source == "github_actions":
-                return await self._fetch_github_logs(incident)
-            elif incident.source == "argocd":
-                return self._fetch_argocd_logs(incident)
-            elif incident.source == "kubernetes":
-                return self._fetch_kubernetes_logs(incident)
-            else:
-                return incident.error_log
-        except Exception as e:
-            logger.warning(f"Failed to fetch detailed logs: {e}")
-            return incident.error_log
-
-    async def _fetch_github_logs(self, incident: IncidentEvent) -> str:
-        """Fetch GitHub Actions workflow logs with enhanced context"""
-        try:
-            raw_event = incident.raw_event
-            if "workflow_run" not in raw_event:
-                return incident.error_log
-            
-            workflow_run = raw_event["workflow_run"]
-            repo_info = raw_event.get("repository", {})
-            
-            # Enhanced error context with GitHub-specific details
-            enhanced_logs = f"""
-=== GITHUB WORKFLOW FAILURE ANALYSIS ===
-Repository: {repo_info.get("full_name", "Unknown")}
-Workflow: {workflow_run.get('name', 'Unknown')}
-Run ID: {workflow_run.get('id', 'Unknown')}
-Branch: {workflow_run.get('head_branch', 'Unknown')}
-Conclusion: {workflow_run.get('conclusion', 'Unknown')}
-Event: {workflow_run.get('event', 'Unknown')}
-Started: {workflow_run.get('created_at', 'Unknown')}
-Commit SHA: {workflow_run.get('head_sha', 'Unknown')[:8]}
-
-=== WORKFLOW CONTEXT ===
-Pull Request: {workflow_run.get('pull_requests', [])}
-Actor: {workflow_run.get('triggering_actor', {}).get('login', 'Unknown')}
-URL: {workflow_run.get('html_url', 'Unknown')}
-
-=== ERROR DETAILS ===
-{incident.error_log}
-
-=== SYSTEM STATE ===
-{json.dumps(incident.system_state, indent=2) if incident.system_state else 'No system state available'}
-"""
-            
-            return enhanced_logs
-            
-        except Exception as e:
-            logger.error(f"Failed to fetch GitHub logs: {e}")
-            return incident.error_log
-
-    def _fetch_argocd_logs(self, incident: IncidentEvent) -> str:
-        """Fetch ArgoCD application logs with enhanced context"""
-        try:
-            raw_event = incident.raw_event
-            if "application" not in raw_event:
-                return incident.error_log
-            
-            app = raw_event["application"]
-            metadata = app.get("metadata", {})
-            status = app.get("status", {})
-            
-            enhanced_logs = f"""
-=== ARGOCD APPLICATION FAILURE ANALYSIS ===
-Application: {metadata.get('name', 'Unknown')}
-Namespace: {metadata.get('namespace', 'Unknown')}
-Project: {metadata.get('labels', {}).get('project', 'Unknown')}
-
-=== SYNC STATUS ===
-Status: {status.get('sync', {}).get('status', 'Unknown')}
-Revision: {status.get('sync', {}).get('revision', 'Unknown')[:8]}
-Message: {status.get('sync', {}).get('message', 'No sync message')}
-
-=== HEALTH STATUS ===
-Status: {status.get('health', {}).get('status', 'Unknown')}
-Message: {status.get('health', {}).get('message', 'No health message')}
-
-=== OPERATION STATUS ===
-{json.dumps(status.get('operationState', {}), indent=2) if status.get('operationState') else 'No operation status'}
-
-=== ORIGINAL ERROR ===
-{incident.error_log}
-"""
-            return enhanced_logs
-            
-        except Exception as e:
-            logger.error(f"Failed to fetch ArgoCD logs: {e}")
-            return incident.error_log
-
-    def _fetch_kubernetes_logs(self, incident: IncidentEvent) -> str:
-        """Fetch Kubernetes pod/resource logs with enhanced context"""
-        try:
-            raw_event = incident.raw_event
-            involved_object = raw_event.get("involvedObject", {})
-            
-            enhanced_logs = f"""
-=== KUBERNETES EVENT FAILURE ANALYSIS ===
-Resource Kind: {involved_object.get('kind', 'Unknown')}
-Resource Name: {involved_object.get('name', 'Unknown')}
-Namespace: {involved_object.get('namespace', 'Unknown')}
-API Version: {involved_object.get('apiVersion', 'Unknown')}
-
-=== EVENT DETAILS ===
-Type: {raw_event.get('type', 'Unknown')}
-Reason: {raw_event.get('reason', 'Unknown')}
-Message: {raw_event.get('message', 'No message')}
-Count: {raw_event.get('count', 1)}
-First Timestamp: {raw_event.get('firstTimestamp', 'Unknown')}
-Last Timestamp: {raw_event.get('lastTimestamp', 'Unknown')}
-
-=== SOURCE COMPONENT ===
-Component: {raw_event.get('source', {}).get('component', 'Unknown')}
-Host: {raw_event.get('source', {}).get('host', 'Unknown')}
-
-=== ORIGINAL ERROR ===
-{incident.error_log}
-"""
-            return enhanced_logs
-            
-        except Exception as e:
-            logger.error(f"Failed to fetch Kubernetes logs: {e}")
-            return incident.error_log
 
     def _pattern_match_analysis(self, incident: IncidentEvent, detailed_logs: str = None) -> Optional[Dict[str, Any]]:
         """Perform comprehensive pattern matching against known error signatures"""
