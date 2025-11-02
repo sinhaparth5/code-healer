@@ -181,50 +181,6 @@ def identify_event_source(event: Dict[str, Any], payload: Dict[str, Any]) -> str
     
     return "unknown"
 
-
-def is_failure_event(payload: Dict[str, Any], source: str) -> bool:
-    """
-    Check if the event represents a failure
-    
-    Args:
-        payload: Webhook payload
-        source: Event source identifier
-        
-    Returns:
-        True if this is a failure event, False otherwise
-    """
-    if source == "github_actions":
-        workflow_run = payload.get("workflow_run", {})
-        return (
-            workflow_run.get("status") == "completed" and
-            workflow_run.get("conclusion") in ["failure", "cancelled", "timed_out"]
-        )
-    
-    elif source == "argocd":
-        application = payload.get("application", {})
-        health_status = application.get("status", {}).get("health", {}).get("status")
-        sync_status = application.get("status", {}).get("sync", {}).get("status")
-        return health_status in ["Degraded", "Missing"] or sync_status == "OutOfSync"
-    
-    elif source == "kubernetes":
-        event_type = payload.get("type", "")
-        reason = payload.get("reason", "")
-        return (
-            event_type == "Warning" or
-            reason in ["Failed", "FailedScheduling", "FailedMount", "Unhealthy", "OOMKilled"]
-        )
-    
-    elif source == "prometheus":
-        alerts = payload.get("alerts", [])
-        return any(alert.get("status") == "firing" for alert in alerts)
-    
-    elif source == "jenkins":
-        build = payload.get("build", {})
-        return build.get("status") in ["FAILURE", "ABORTED", "UNSTABLE"]
-    
-    return False
-
-
 def verify_webhook_signature(event: Dict[str, Any], body: str, source: str) -> bool:
     """
     Verify webhook signature for security
@@ -320,20 +276,18 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 "body": json.dumps({"error": "Invalid signature"})
             }
         
-        # Check if this is a failure event
-        if not is_failure_event(payload, source):
-            logger.info(f"Event is not a failure, ignoring")
-            return {
-                "statusCode": 200,
-                "body": json.dumps({"message": "Event processed (not a failure)"})
-            }
-        
-        # Get CodeHealer agent
         agent = get_agent()
         
         # Process the failure event asynchronously
         logger.info(f"Processing failure event from {source}")
         result = asyncio.run(agent.process_failure_event(payload))
+
+        if result.get("status") == "ignored":
+            logger.info(f"Event is not a failure")
+            return {
+                "statusCode": 200,
+                "body": json.dumps({ "message": "Event processed" })
+            }
         
         # Log result
         logger.info(f"Failure processing complete", extra={
