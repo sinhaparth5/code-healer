@@ -39,23 +39,52 @@ class GitHubClient:
     def get_workflow_logs(self, owner: str, repo: str, run_id: int) -> Optional[str]:
         try:
             url = f"https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}/logs"
+            logger.info(f"Fetching workflow logs from: {url}")
+            logger.info(f"Using token: {self.token[:10]}..." if self.token else "No token available")
             response = self.session.get(url, allow_redirects=True)
+            
+            if response.status_code == 401:
+                logger.error(f"GitHub token authentication failed. Token may be invalid or expired.")
+                return "=== AUTHENTICATION ERROR ===\nGitHub token authentication failed. Token may be invalid or expired.\n"
+            elif response.status_code == 403:
+                logger.error(f"GitHub token doesn't have required permissions for accessing workflow logs.")
+                return "=== PERMISSION ERROR ===\nGitHub token doesn't have required permissions for accessing workflow logs.\n"
+            
             response.raise_for_status()
             return response.text
         except Exception as e:
             logger.error(f"Failed to get workflow logs: {e}")
-            return None
+            return f"=== ERROR FETCHING LOGS ===\nFailed to fetch logs: {str(e)}\n"
 
-    def get_job_logs(self, owner: str, repo: str, job_id: str) -> Optional[str]:
+    def list_workflow_jobs(self, owner: str, repo: str, run_id: int) -> List[Dict[str, Any]]:
         try:
-            url = f"https://api.github.com/repos/{owner}/{repo}/actions/jobs/{job_id}/logs"
+            url = f"https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}/jobs"
+            logger.info(f"Fetching workflow jobs from: {url}")
             response = self.session.get(url)
+            
+            if response.status_code == 401:
+                logger.error(f"GitHub token authentication failed for jobs endpoint.")
+                return []
+            elif response.status_code == 403:
+                logger.error(f"GitHub token doesn't have required permissions for accessing workflow jobs.")
+                return []
+            
             response.raise_for_status()
             jobs_data = response.json()
             return jobs_data.get("jobs", [])
         except Exception as e:
             logger.error(f"Failed to list workflow jobs: {e}")
             return []
+
+    def get_job_logs(self, owner: str, repo: str, job_id: str) -> Optional[str]:
+        try:
+            url = f"https://api.github.com/repos/{owner}/{repo}/actions/jobs/{job_id}/logs"
+            response = self.session.get(url, allow_redirects=True)
+            response.raise_for_status()
+            return response.text
+        except Exception as e:
+            logger.error(f"Failed to get job logs: {e}")
+            return None
 
     def rerun_workflow(self, owner: str, repo: str, run_id: int) -> bool:
         try:
