@@ -610,7 +610,7 @@ Respond with a JSON array of solutions:"""
                 steps=steps,
                 confidence=confidence,
                 success_rate=0.95,  # High for peer-validated solutions
-                last_used=None,
+                last_used=slack_solution.timestamp,
                 environment_match=True,  # Slack solutions are environment-agnostic
                 code_changes=[],
                 estimated_duration=10  # Default for Slack solutions

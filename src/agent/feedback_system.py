@@ -128,11 +128,11 @@ class FeedbackSystem:
             
             outcome_record = OutcomeRecord(
                 incident_id=incident.incident_id,
-                remediation_id=resolution.resolution_id if resolution else "none",
+                remediation_id=getattr(resolution, 'resolution_id', 'none') if resolution else 'none',
                 outcome_type=outcome_type,
                 timestamp=datetime.utcnow(),
-                resolution_time_seconds=remediation_result.resolution_time_seconds if remediation_result else 0,
-                confidence_at_execution=resolution.confidence if resolution else 0.0,
+                resolution_time_seconds=getattr(remediation_result, 'resolution_time_seconds', 0) if remediation_result else 0,
+                confidence_at_execution=getattr(resolution, 'confidence', 0.0) if resolution else 0.0,
                 actual_root_cause=self._extract_actual_root_cause(human_feedback),
                 effectiveness_score=effectiveness_score,
                 human_feedback=human_feedback,
@@ -180,12 +180,14 @@ class FeedbackSystem:
             return 0.0
         
         score = 0.0
+
+        outcome = getattr(remediation_result, 'outcome', 'unknown')
         
-        if remediation_result.outcome == "success":
+        if outcome == "success":
             score += 0.7
-        elif remediation_result.outcome == "partial":
+        elif outcome == "partial":
             score += 0.4
-        elif remediation_result.outcome == "failure":
+        elif outcome == "failure":
             score += 0.1
         
         if remediation_result.resolution_time_seconds > 0:
@@ -263,8 +265,9 @@ class FeedbackSystem:
         
         if not resolution:
             return
-        
-        calibration_key = f"{analysis.primary_category.value}_{analysis.subcategory}_{resolution.source.value}"
+
+        source_value = getattr(resolution.source, 'value', 'unknown') if hasattr(resolution, 'source') else 'unknown' 
+        calibration_key = f"{analysis.primary_category.value}_{analysis.subcategory}_{source_value}"
         
         if calibration_key not in self.confidence_adjustments:
             self.confidence_adjustments[calibration_key] = {
@@ -387,8 +390,10 @@ class FeedbackSystem:
         if not resolution:
             return
         
-        source_key = f"{resolution.source.value}_{resolution.resolution_id}"
-        
+        source_value = getattr(resolution.source, 'value', 'unknown') if hasattr(resolution, 'source') else 'unknown'
+        resolution_id = getattr(resolution, 'resolution_id', 'unknown')
+        source_key = f"{source_value}_{resolution_id}"
+
         if source_key not in self.knowledge_deprecation:
             self.knowledge_deprecation[source_key] = {
                 "source": resolution.source.value,
