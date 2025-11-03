@@ -74,34 +74,61 @@ Update in Vector DB (learn for next time)
 ## 🚀 Quick Start
 
 ### Prerequisites
-- AWS Account
+- AWS Account with CLI installed
 - GitHub repository with Actions
-- Slack workspace
-- Terraform 1.5+
+- GitHub Personal Access Token
+- NVIDIA NIM API Key
+- Terraform 1.5+ (installed automatically by script)
 
 ### Deploy
 
 ```bash
-# 1. Bootstrap Terraform backend
-./scripts/bootstrap_terraform.sh
+# 1. Configure AWS credentials
+aws configure
+# Enter your AWS Access Key ID, Secret Access Key, Region, and output format
 
-# 2. Configure
-cd terraform
-cp terraform.tfvars.example terraform.tfvars
-# Edit with your values
+# 2. Make deployment script executable
+chmod +x new_deploy.sh
 
-# 3. Deploy
-terraform init
-terraform apply
-
-# 4. Configure webhooks
-# GitHub: Settings → Webhooks → Add (use output URL)
-# Slack: Install bot, invite to channels
+# 3. Run deployment script
+./new_deploy.sh
 ```
+
+The script will prompt you for:
+- **GitHub Token** - Personal access token with repo and workflow permissions
+- **GitHub Repository Name** - Format: `owner/repo-name`
+- **Webhook Secret** - A secure random string (e.g., generated with `openssl rand -hex 20`)
+- **NVIDIA NIM API Key** - Your NVIDIA NIM API key for Llama 3.1
+
+### 4. Configure GitHub Webhook
+
+After deployment completes, the script outputs a webhook URL:
+```
+Webhook URL: https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/prod/webhook
+```
+
+Add this to your GitHub repository:
+1. Go to your GitHub repo → **Settings** → **Webhooks** → **Add webhook**
+2. Paste the webhook URL
+3. Set **Content type** to `application/json`
+4. Enter the same **Webhook Secret** you used during deployment
+5. Select **Let me select individual events** → Check `Workflow jobs` and `Workflow runs`
+6. Click **Add webhook**
+
+### Monitor
+
+Watch DevFlowFix analyze and fix failures in real-time:
+```bash
+# View Lambda logs in CloudWatch
+aws logs tail /aws/lambda/devflowfix-handler --follow
+```
+
+Or visit the AWS Console:
+**CloudWatch** → **Log groups** → `/aws/lambda/devflowfix-handler`
 
 ### Test
 
-Push a failing workflow:
+Push a failing workflow to trigger DevFlowFix:
 ```yaml
 # .github/workflows/test-fail.yml
 name: Test Failure
@@ -110,10 +137,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - run: docker pull nonexistent:tag  # This will fail
+      - run: docker pull nonexistent/image:invalid-tag  # This will fail
 ```
 
-Watch CodeHealer analyze and retry/fix!
+Push this to your repository and watch the logs in CloudWatch to see DevFlowFix in action!
 
 ---
 
@@ -152,6 +179,7 @@ codehealer/
 ├── scripts/                # Deployment helpers
 ├── docs/                   # Full documentation
 │   └── paper.pdf           # Complete technical paper
+├── new_deploy.sh           # One-command deployment script
 ├── requirements.txt
 ├── .env.example
 └── README.md               # This file
@@ -214,9 +242,8 @@ Apache 2.0 - See [LICENSE](LICENSE)
 
 ## Support
 
-- **Issues:** [GitHub Issues](https://github.com/your-org/codehealer/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/your-org/codehealer/discussions)
-- **Email:** team@codehealer.dev
+- **Issues:** [GitHub Issues](https://github.com/sinhaparth5/devflowfix/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/sinhaparth5/devflowfix/discussions)
 
 ---
 
