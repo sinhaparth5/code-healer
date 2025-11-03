@@ -144,21 +144,6 @@ Push this to your repository and watch the logs in CloudWatch to see DevFlowFix 
 
 ---
 
-## What DevFlowFix Fixes
-
-| Failure Type | Action | Success Rate |
-|--------------|--------|--------------|
-| YAML syntax errors | Auto-fix + PR | 98% |
-| Expired credentials | Refresh + retry | 90% |
-| Missing secrets | Alert with fix | 95% |
-| Image pull errors | Auth fix + retry | 92% |
-| Resource limits (OOMKilled) | Scale up | 85% |
-| Transient network errors | Retry with backoff | 80% |
-| Config drift | Reconcile state | 93% |
-| Permission errors | Escalate with context | N/A |
-
----
-
 ## Project Structure
 
 ```
