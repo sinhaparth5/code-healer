@@ -21,7 +21,7 @@ DevFlowFix monitors your deployment pipelines and:
 5. **Escalates** complex issues to engineers with detailed context
 6. **Learns** from every incident to improve over time
 
-**Example:** GitHub Actions fails with expired credentials → CodeHealer refreshes token, updates secret, re-triggers workflow → Fixed in 3 minutes (vs 2 hours manual).
+**Example:** GitHub Actions fails with expired credentials → DevFlowFix refreshes token, updates secret, re-triggers workflow → Fixed in 3 minutes (vs 2 hours manual).
 
 ---
 
@@ -144,7 +144,7 @@ Push this to your repository and watch the logs in CloudWatch to see DevFlowFix 
 
 ---
 
-## What CodeHealer Fixes
+## What DevFlowFix Fixes
 
 | Failure Type | Action | Success Rate |
 |--------------|--------|--------------|
@@ -162,7 +162,7 @@ Push this to your repository and watch the logs in CloudWatch to see DevFlowFix 
 ## Project Structure
 
 ```
-codehealer/
+DevFlowFix/
 ├── src/                    # Python Lambda code
 │   ├── lambda_handler.py   # Webhook processor
 │   ├── agent/              # Analysis logic
