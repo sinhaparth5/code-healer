@@ -13,7 +13,7 @@
 
 ## What It Does
 
-CodeHealer monitors your deployment pipelines and:
+DevFlowFix monitors your deployment pipelines and:
 1. **Detects** failures in GitHub Actions, ArgoCD, Kubernetes pods
 2. **Analyzes** error logs using Llama 3.1 NIM to identify root causes
 3. **Searches** team Slack history for proven solutions
