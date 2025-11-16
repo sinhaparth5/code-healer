@@ -6,7 +6,7 @@ services:
       - "4566:4566"            # LocalStack Gateway
       - "4510-4559:4510-4559"  # External services port range
     environment:
-      - SERVICES=s3,dynamodb,lambda,apigateway,secretsmanager,sns,sqs,iam,sts,cloudwatch,logs,kms
+      - SERVICES=s3,dynamodb,lambda,apigateway,secretsmanager,sns,sqs,iam,sts,cloudwatch,logs,kms,ec2
       - DEBUG=1
       - LAMBDA_EXECUTOR=docker-reuse
       - DOCKER_HOST=unix:///var/run/docker.sock

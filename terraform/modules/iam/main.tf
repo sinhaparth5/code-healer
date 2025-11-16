@@ -227,25 +227,29 @@ resource "aws_iam_policy" "secrets_access" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "secretsmanager:GetSecretValue",
-          "secretsmanager:DescribeSecret"
-        ]
-        Resource = [
-          "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.project_name}/*"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "kms:Decrypt"
-        ]
-        Resource = var.secrets_kms_key_arn != null ? [var.secrets_kms_key_arn] : []
-      }
-    ]
+    Statement = concat(
+      [
+        {
+          Effect = "Allow"
+          Action = [
+            "secretsmanager:GetSecretValue",
+            "secretsmanager:DescribeSecret"
+          ]
+          Resource = [
+            "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.project_name}/*"
+          ]
+        }
+      ],
+      var.secrets_kms_key_arn != null ? [
+        {
+          Effect = "Allow"
+          Action = [
+            "kms:Decrypt"
+          ]
+          Resource = [var.secrets_kms_key_arn]
+        }
+      ] : []
+    )
   })
 
   tags = var.tags
@@ -364,25 +368,29 @@ resource "aws_iam_role_policy" "monitoring" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-          "logs:DescribeLogStreams"
-        ]
-        Resource = "arn:aws:logs:${var.aws_region}:${var.aws_account_id}:log-group:/aws/${var.project_name}/*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "sns:Publish"
-        ]
-        Resource = var.sns_topic_arns
-      }
-    ]
+    Statement = concat(
+      [
+        {
+          Effect = "Allow"
+          Action = [
+            "logs:CreateLogGroup",
+            "logs:CreateLogStream",
+            "logs:PutLogEvents",
+            "logs:DescribeLogStreams"
+          ]
+          Resource = "arn:aws:logs:${var.aws_region}:${var.aws_account_id}:log-group:/aws/${var.project_name}/*"
+        }
+      ],
+      length(var.sns_topic_arns) > 0 ? [
+        {
+          Effect = "Allow"
+          Action = [
+            "sns:Publish"
+          ]
+          Resource = var.sns_topic_arns
+        }
+      ] : []
+    )
   })
 }
 

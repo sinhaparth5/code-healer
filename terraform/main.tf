@@ -249,8 +249,32 @@ module "dynamodb" {
   tags                                = local.common_tags
 }
 
+module "secrets" {
+  source = "./modules/secrets"
+
+  project_name            = var.project_name
+  environment             = var.environment
+  recovery_window_in_days = var.secret_recovery_window_days
+  kms_key_id              = var.kms_key_arn
+  github_token            = var.github_token
+  github_webhook_secret   = var.github_webhook_secret
+  slack_token             = var.slack_token
+  openai_api_key          = var.openai_api_key
+  argocd_token            = var.argocd_token
+  k8s_config              = var.k8s_config
+  nvidia_nim_api_key      = var.nvidia_nim_api_key
+  github_repo             = var.github_repo
+  slack_channel_id        = var.slack_channel_id
+  slack_senior_dev_id     = var.slack_senior_dev_id
+  llm_provider            = var.llm_provider
+  
+  tags                    = local.common_tags
+  
+  depends_on = [module.iam]
+}
+
 resource "aws_s3_bucket" "deployment" {
-  bucket = "${var.project_name}-deployment-${data.aws_caller_identity.current.account_id}"
+  bucket = "${lower(var.project_name)}-deployment-${data.aws_caller_identity.current.account_id}"
 
   tags = local.common_tags
 }
@@ -284,7 +308,7 @@ resource "aws_s3_bucket_public_access_block" "deployment" {
 }
 
 resource "aws_s3_bucket" "model_artifacts" {
-  bucket = "${var.project_name}-model-artifacts-${data.aws_caller_identity.current.account_id}"
+  bucket = "${lower(var.project_name)}-model-artifacts-${data.aws_caller_identity.current.account_id}"
 
   tags = local.common_tags
 }
@@ -318,7 +342,7 @@ resource "aws_s3_bucket_public_access_block" "model_artifacts" {
 }
 
 resource "aws_s3_bucket" "data_capture" {
-  bucket = "${var.project_name}-data-capture-${data.aws_caller_identity.current.account_id}"
+  bucket = "${lower(var.project_name)}-data-capture-${data.aws_caller_identity.current.account_id}"
 
   tags = local.common_tags
 }
@@ -329,6 +353,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "data_capture" {
   rule {
     id     = "expire-old-data"
     status = "Enabled"
+    filter { }
 
     expiration {
       days = var.data_capture_retention_days

@@ -1,7 +1,20 @@
+resource "null_resource" "install_dependencies" {
+  triggers = {
+    requirements = filemd5("${path.root}/../requirements.txt")
+  }
+
+  provisioner "local-exec" {
+    command = "pip install -r ${path.root}/../requirements.txt -t ${path.root}/../src --upgrade"
+    working_dir = path.root
+  }
+}
+
 data "archive_file" "lambda_package" {
   type = "zip"
   source_dir = "${path.root}/../src"
   output_path = "${path.root}/../deployment/lambda_package.zip"
+
+  depends_on = [ null_resource.install_dependencies ]
 }
 
 resource "aws_lambda_function" "codehealer" {
@@ -134,7 +147,7 @@ resource "aws_iam_role" "lambda_execution" {
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_basic" {
-  role = aws_iam_role.lambda_execution
+  role = aws_iam_role.lambda_execution.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
@@ -156,89 +169,93 @@ resource "aws_iam_role_policy" "lambda_permissions" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "secretsmanager:GetSecretValue",
-          "secretsmanager:DescribeSecret"
-        ]
-        Resource = [
-          var.github_token_secret_arn,
-          var.github_webhook_secret_arn,
-          var.slack_token_secret_arn,
-          var.argocd_token_secret_arn,
-          var.k8s_config_secret_arn,
-          var.openai_api_key_secret_arn,
-          var.nvidia_nim_api_key_secret_arn,
-          var.app_config_secret_arn
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "kms:Decrypt"
-        ]
-        Resource = var.kms_key_arn != null ? [var.kms_key_arn] : []
-        Condition = {
-          StringEquals = {
-            "kms:ViaService" = "secretsmanager.${var.aws_region}.amazonaws.com"
+    Statement = concat(
+      [
+        {
+          Effect = "Allow"
+          Action = [
+            "secretsmanager:GetSecretValue",
+            "secretsmanager:DescribeSecret"
+          ]
+          Resource = [
+            var.github_token_secret_arn,
+            var.github_webhook_secret_arn,
+            var.slack_token_secret_arn,
+            var.argocd_token_secret_arn,
+            var.k8s_config_secret_arn,
+            var.openai_api_key_secret_arn,
+            var.nvidia_nim_api_key_secret_arn,
+            var.app_config_secret_arn
+          ]
+        },
+        {
+          Effect = "Allow"
+          Action = [
+            "dynamodb:PutItem",
+            "dynamodb:GetItem",
+            "dynamodb:UpdateItem",
+            "dynamodb:Query",
+            "dynamodb:Scan"
+          ]
+          Resource = [
+            var.dynamodb_table_arn,
+            "${var.dynamodb_table_arn}/index/*"
+          ]
+        },
+        {
+          Effect = "Allow"
+          Action = [
+            "es:ESHttpPost",
+            "es:ESHttpPut",
+            "es:ESHttpGet"
+          ]
+          Resource = "${var.opensearch_domain_arn}/*"
+        },
+        {
+          Effect = "Allow"
+          Action = [
+            "sagemaker:InvokeEndpoint"
+          ]
+          Resource = [
+            var.sagemaker_llm_endpoint_arn,
+            var.sagemaker_embedding_endpoint_arn
+          ]
+        },
+        {
+          Effect = "Allow"
+          Action = [
+            "sqs:SendMessage"
+          ]
+          Resource = aws_sqs_queue.dlq.arn
+        },
+        {
+          Effect = "Allow"
+          Action = [
+            "logs:CreateLogGroup",
+            "logs:CreateLogStream",
+            "logs:PutLogEvents"
+          ]
+          Resource = "arn:aws:logs:${var.aws_region}:${var.aws_account_id}:log-group:/aws/lambda/${var.project_name}-*:*"
+        }
+      ],
+      # Only add KMS statement if KMS key exists
+      var.kms_key_arn != null ? [
+        {
+          Effect = "Allow"
+          Action = [
+            "kms:Decrypt"
+          ]
+          Resource = [var.kms_key_arn]
+          Condition = {
+            StringEquals = {
+              "kms:ViaService" = "secretsmanager.${var.aws_region}.amazonaws.com"
+            }
           }
         }
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "dynamodb:PutItem",
-          "dynamodb:GetItem",
-          "dynamodb:UpdateItem",
-          "dynamodb:Query",
-          "dynamodb:Scan"
-        ]
-        Resource = [
-          var.dynamodb_table_arn,
-          "${var.dynamodb_table_arn}/index/*"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "es:ESHttpPost",
-          "es:ESHttpPut",
-          "es:ESHttpGet"
-        ]
-        Resource = "${var.opensearch_domain_arn}/*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "sagemaker:InvokeEndpoint"
-        ]
-        Resource = [
-          var.sagemaker_llm_endpoint_arn,
-          var.sagemaker_embedding_endpoint_arn
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "sqs:SendMessage"
-        ]
-        Resource = aws_sqs_queue.dlq.arn
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ]
-        Resource = "arn:aws:logs:${var.aws_region}:${var.aws_account_id}:log-group:/aws/lambda/${var.project_name}-*:*"
-      }
-    ]
+      ] : []
+    )
   })
 }
-
 resource "aws_lambda_alias" "live" {
   name = "live"
   function_name = aws_lambda_function.codehealer.function_name
